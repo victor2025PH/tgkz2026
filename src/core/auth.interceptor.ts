@@ -12,6 +12,9 @@ import { inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { catchError, from, switchMap, throwError } from 'rxjs';
 import { AuthEventsService, AUTH_STORAGE_KEYS } from './auth-events.service';
+import { getEffectiveApiBaseUrl } from './get-effective-api-base';
+import { environment } from '../environments/environment';
+import { isElectronRuntime } from '../utils/runtime-env.util';
 
 // 正在刷新 Token 的標記（避免重複刷新）
 let isRefreshing = false;
@@ -29,8 +32,9 @@ async function refreshToken(): Promise<boolean> {
   }
   
   try {
-    const baseUrl = window.location.hostname === 'localhost' ? 'http://localhost:8000' : '';
-    const response = await fetch(`${baseUrl}/api/v1/auth/refresh`, {
+    const baseUrl = getEffectiveApiBaseUrl();
+    const refreshUrl = baseUrl ? `${baseUrl}/api/v1/auth/refresh` : '/api/v1/auth/refresh';
+    const response = await fetch(refreshUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refresh_token: refreshTokenValue })
@@ -70,6 +74,11 @@ async function handle401Error(
   authEvents: AuthEventsService,
   router: Router
 ): Promise<any> {
+  // 安裝版（Electron）無 HTTP 登入，不因 401 跳轉登入頁
+  // 🔧 main 側引用了未定義的 isElectronEnv/environment（缺 import），合併時補上並統一用共用工具
+  if (environment.apiMode === 'ipc' && isElectronRuntime()) {
+    throw new Error('Session expired');
+  }
   // 如果已經在刷新，等待刷新完成
   if (isRefreshing && refreshPromise) {
     const success = await refreshPromise;

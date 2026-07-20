@@ -500,7 +500,12 @@ export class AlertNotificationComponent implements OnInit, OnDestroy {
         // 從當前展示中移除 CPU 告警（避免舊提示殘留）
         this.visibleNotifications.update(list => list.filter(n => n.type !== 'cpu_high'));
       }
-    } catch (e) {
+    } catch (e: any) {
+      const msg = String((e?.message || e) ?? '');
+      if (msg.includes('No handler registered') || msg.includes('alerts:get')) {
+        // 桌面版未註冊 alerts:get 時靜默跳過，不報錯
+        return;
+      }
       console.error('Load alerts failed:', e);
     }
   }

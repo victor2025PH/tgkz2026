@@ -12,9 +12,38 @@ import json
 import logging
 from datetime import datetime
 
+import aiohttp
 from aiohttp import web
 
 logger = logging.getLogger(__name__)
+
+
+async def _validate_telegram_bot(bot_token: str, expected_username: str) -> tuple[bool, str | None, str | None]:
+    """
+    調用 Telegram getMe 驗證 Bot 是否存在，並校驗用戶名是否一致。
+    返回 (valid, telegram_username, error_message)。
+    """
+    if not bot_token or not bot_token.strip():
+        return False, None, "TELEGRAM_BOT_TOKEN 未配置"
+    token = bot_token.strip()
+    url = f"https://api.telegram.org/bot{token}/getMe"
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, timeout=aiohttp.ClientTimeout(total=5)) as resp:
+                data = await resp.json()
+                if not data.get("ok"):
+                    return False, None, data.get("description", "Bot 不存在或 Token 無效")
+                user = data.get("result", {})
+                telegram_username = (user.get("username") or "").strip()
+                if not telegram_username:
+                    return False, None, "Bot 無用戶名"
+                expected = (expected_username or "").strip().lstrip("@").lower()
+                if expected and telegram_username.lower() != expected:
+                    return False, telegram_username, f"Bot 用戶名不匹配：配置為 @{expected_username}，實際為 @{telegram_username}"
+                return True, telegram_username, None
+    except Exception as e:
+        logger.warning("Telegram getMe 校驗失敗: %s", e)
+        return False, None, str(e)
 
 
 class AuthOAuthMixin:
@@ -137,7 +166,7 @@ class AuthOAuthMixin:
     async def oauth_telegram_config(self, request):
         """獲取 Telegram OAuth 配置（用於前端 Widget）"""
         import os
-        bot_username = os.environ.get('TELEGRAM_BOT_USERNAME', '')
+        bot_username = os.environ.get('TELEGRAM_BOT_USERNAME') or 'tgzkw_bot'
         bot_token = os.environ.get('TELEGRAM_BOT_TOKEN', '')
         
         # 從 Bot Token 中提取 Bot ID（格式：bot_id:secret）
@@ -195,9 +224,13 @@ class AuthOAuthMixin:
             )
             
             # 構建 URLs
-            bot_username = os.environ.get('TELEGRAM_BOT_USERNAME') or 'TGSmartKingBot'
+            bot_username = os.environ.get('TELEGRAM_BOT_USERNAME') or 'tgzkw_bot'
+            bot_token = os.environ.get('TELEGRAM_BOT_TOKEN', '')
+            bot_valid, _telegram_username, bot_error = await _validate_telegram_bot(bot_token, bot_username)
+            if not bot_valid and bot_error:
+                logger.warning("[Login] Bot 校驗未通過: %s", bot_error)
             
-            # 🆕 簡化方案：QR Code 直接使用 Deep Link
+            # 🆕 簡化方案：QR Code 直接使用 Deep Link（Telegram start 參數上限 64 字符，故 token 為 58 字符）
             # 新用戶掃碼會自動發送 /start login_xxx
             deep_link_url = f"https://t.me/{bot_username}?start=login_{login_token.token}"
             
@@ -214,19 +247,25 @@ class AuthOAuthMixin:
             # 如果本地生成失敗，提供備用 URL
             qr_fallback_url = LoginTokenService.get_fallback_qr_url(deep_link_url, size=qr_size) if not qr_image else None
             
+            payload = {
+                'token': login_token.token,
+                'token_id': login_token.id,
+                'deep_link_url': deep_link_url,      # Telegram Deep Link（QR Code 內容）
+                'verify_code': verify_code,          # 🆕 6 位驗證碼（老用戶手動輸入）
+                'bot_username': bot_username,
+                'expires_in': 300,  # 5 分鐘
+                'expires_at': login_token.expires_at.isoformat(),
+                'qr_image': qr_image,           # Base64 圖片
+                'qr_fallback_url': qr_fallback_url  # 備用外部 URL
+            }
+            if not bot_valid:
+                payload['bot_valid'] = False
+                payload['bot_error'] = bot_error or '登入 Bot 未配置或不存在，掃碼會提示「該用戶似乎不存在」'
+            else:
+                payload['bot_valid'] = True
             return self._json_response({
                 'success': True,
-                'data': {
-                    'token': login_token.token,
-                    'token_id': login_token.id,
-                    'deep_link_url': deep_link_url,      # Telegram Deep Link（QR Code 內容）
-                    'verify_code': verify_code,          # 🆕 6 位驗證碼（老用戶手動輸入）
-                    'bot_username': bot_username,
-                    'expires_in': 300,  # 5 分鐘
-                    'expires_at': login_token.expires_at.isoformat(),
-                    'qr_image': qr_image,           # Base64 圖片
-                    'qr_fallback_url': qr_fallback_url  # 備用外部 URL
-                }
+                'data': payload
             })
             
         except Exception as e:
@@ -258,7 +297,9 @@ class AuthOAuthMixin:
             if status == 'not_found':
                 return self._json_response({
                     'success': False,
-                    'error': 'Token 不存在'
+                    'error': 'Token 不存在',
+                    'code': 'TOKEN_NOT_FOUND',
+                    'hint': '請確認 Bot 的 INTERNAL_API_URL 與生成二維碼的後端一致（同一實例或共享數據庫）'
                 }, 404)
             
             if status == 'expired':
@@ -288,6 +329,9 @@ class AuthOAuthMixin:
                         'error': '無法創建用戶'
                     }, 500)
                 
+                # 更新最後登錄時間（後台「用戶管理」可顯示最後登錄）
+                auth_service.update_user_last_login(user.id)
+                
                 # 生成 JWT Token
                 role_str = user.role.value if hasattr(user.role, 'value') else user.role
                 access_token = generate_access_token(user.id, user.email or '', role_str)
@@ -314,7 +358,7 @@ class AuthOAuthMixin:
             # 其他狀態（pending, scanned）
             # 🆕 返回 deep_link_url 供中轉頁面使用
             import os
-            bot_username = os.environ.get('TELEGRAM_BOT_USERNAME') or 'TGSmartKingBot'
+            bot_username = os.environ.get('TELEGRAM_BOT_USERNAME') or 'tgzkw_bot'
             deep_link_url = f"https://t.me/{bot_username}?start=login_{token}"
             
             # 獲取 Token 對象以計算剩餘時間
@@ -357,7 +401,16 @@ class AuthOAuthMixin:
             token = request.match_info['token']
             
             # 驗證 Bot 密鑰（安全檢查）
-            body = await request.json()
+            try:
+                body = await request.json()
+            except Exception as e:
+                logger.warning(f"confirm_login_token: invalid JSON body: {e}")
+                return self._json_response({
+                    'success': False,
+                    'error': '請求體無效，需要 JSON'
+                }, 400)
+            if not isinstance(body, dict):
+                body = {}
             bot_secret = body.get('bot_secret', '')
             expected_secret = os.environ.get('TELEGRAM_BOT_TOKEN', '').split(':')[-1][:16]
             
@@ -592,7 +645,7 @@ class AuthOAuthMixin:
         provider = request.query.get('provider', 'telegram')
         
         # 獲取 Bot 配置
-        bot_username = os.environ.get('TELEGRAM_BOT_USERNAME', '')
+        bot_username = os.environ.get('TELEGRAM_BOT_USERNAME') or 'tgzkw_bot'
         
         if not bot_username:
             return self._json_response({

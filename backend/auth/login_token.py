@@ -103,8 +103,8 @@ class LoginTokenService:
     # Token 有效期（秒）
     TOKEN_EXPIRY_SECONDS = 300  # 5 分鐘
     
-    # Token 長度
-    TOKEN_LENGTH = 32  # 生成 64 字符的 hex 字符串
+    # Token 長度（須滿足 Telegram Deep Link start 參數 ≤64 字符：前綴 "login_" 佔 6 字符，故 token 最多 58 字符）
+    TOKEN_LENGTH = 29  # 生成 58 字符的 hex 字符串，使 "login_" + token = 64 字符
     
     def __init__(self, db_path: Optional[str] = None):
         """初始化服務"""
@@ -268,12 +268,22 @@ class LoginTokenService:
         if not login_token:
             return False, "Token 不存在"
         
+        # 冪等：已確認視為成功，不再返回錯誤（方案：掃碼登錄後 Bot 提示詞優化）
+        if login_token.status == LoginTokenStatus.CONFIRMED:
+            logger.info(f"Login token already confirmed (idempotent): {token[:8]}... by TG user {telegram_id}")
+            return True, None
+        
         if login_token.status != LoginTokenStatus.PENDING:
-            return False, f"Token 狀態無效: {login_token.status.value}"
+            # 過期/取消等：返回用戶可理解的短句，不暴露技術狀態值
+            if login_token.status == LoginTokenStatus.EXPIRED:
+                return False, "登錄請求已過期，請返回網頁重新掃碼"
+            if login_token.status == LoginTokenStatus.CANCELLED:
+                return False, "登錄已取消，請重新發起登入"
+            return False, "登錄請求無效，請返回網頁重新嘗試"
         
         if login_token.is_expired():
             self._update_status(token, LoginTokenStatus.EXPIRED)
-            return False, "Token 已過期，請重新獲取"
+            return False, "登錄請求已過期，請返回網頁重新掃碼"
         
         # 更新 Token 狀態
         try:

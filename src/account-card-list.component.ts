@@ -623,31 +623,27 @@ export const PROXY_TYPES = [
                 <span class="health-text">{{ account.healthScore || 100 }}%</span>
               </div>
               
-              <!-- 登入進度指示器 -->
-              @if (isLoggingIn(account.id) || account.status === 'Logging in...' || account.status === 'Waiting Code' || account.status === 'Waiting 2FA') {
-                <div class="login-progress-overlay">
+              <!-- 登入進度指示器（簡化版：僅 spinner，驗證碼輸入已移至獨立彈窗） -->
+              @if (isLoggingIn(account.id) && account.status !== 'Waiting Code' && account.status !== 'Waiting 2FA') {
+                <div class="login-progress-overlay" (click)="$event.stopPropagation()">
                   <div class="login-spinner"></div>
                   <span class="login-status-text">
-                    @switch (account.status) {
-                      @case ('Logging in...') { 正在連接... }
-                      @case ('Waiting Code') { 等待驗證碼 }
-                      @case ('Waiting 2FA') { 等待2FA密碼 }
-                      @default { {{ getLoginProgress(account.id)?.step || '處理中...' }} }
-                    }
+                    {{ getLoginProgress(account.id)?.step || '正在連接...' }}
                   </span>
+                  <button class="overlay-cancel-btn" (click)="cancelLogin(account)">取消</button>
                 </div>
               }
 
               <!-- 快捷操作（帶文字标签） -->
               <div class="card-actions" (click)="$event.stopPropagation()">
                 @if (canLogin(account) && !isLoggingIn(account.id)) {
-                  <button (click)="onLogin(account)" class="action-btn login" title="登入账号">
+                  <button (click)="openLoginModal(account)" class="action-btn login" title="登入账号">
                     <span class="action-icon">▶️</span>
                     <span class="action-label">登入</span>
                   </button>
                 }
                 @if (isLoggingIn(account.id) || account.status === 'Logging in...' || account.status === 'Waiting Code' || account.status === 'Waiting 2FA') {
-                  <button class="action-btn logging-in" disabled title="登入中...">
+                  <button class="action-btn logging-in" (click)="openLoginModal(account)" title="查看登入進度">
                     <span class="action-icon spinning">⏳</span>
                     <span class="action-label">登入中</span>
                   </button>
@@ -721,7 +717,7 @@ export const PROXY_TYPES = [
                   <td>{{ account.dailySendCount || 0 }}/{{ account.dailySendLimit || 50 }}</td>
                   <td class="actions-cell" (click)="$event.stopPropagation()">
                     @if (canLogin(account)) {
-                      <button (click)="onLogin(account)" class="table-action login" title="登入账号">▶️</button>
+                      <button (click)="openLoginModal(account)" class="table-action login" title="登入账号">▶️</button>
                     }
                     @if (account.status === 'Online') {
                       <button (click)="onLogout(account)" class="table-action logout" title="退出账号">⏹️</button>
@@ -853,6 +849,42 @@ export const PROXY_TYPES = [
             </div>
           </div>
 
+          <!-- P1-5 + P2-3: 最近事件（含篩選 + 相對時間） -->
+          <div class="detail-section">
+            <div class="detail-events-header">
+              <h4>📜 最近事件</h4>
+              <div class="event-filter-tabs">
+                @for (f of [
+                  {id: 'all',             label: '全部'},
+                  {id: 'login',           label: '登入'},
+                  {id: 'logout',          label: '登出'},
+                  {id: 'disconnect',      label: '斷開'},
+                  {id: 'session_expired', label: '過期'},
+                  {id: 'reconnect_ok',    label: '重連'}
+                ]; track f.id) {
+                  <button
+                    class="event-filter-tab"
+                    [class.active]="accountEventsFilter() === f.id"
+                    (click)="accountEventsFilter.set($any(f.id))"
+                  >{{ f.label }}</button>
+                }
+              </div>
+            </div>
+            @if (filteredAccountEvents().length > 0) {
+              <ul class="detail-events-list">
+                @for (ev of filteredAccountEvents(); track ev.created_at + ev.event_type) {
+                  <li>
+                    <span class="event-type" [ngClass]="getEventTypeClass(ev.event_type)">{{ getAccountEventLabel(ev.event_type) }}</span>
+                    @if (ev.reason) { <span class="event-reason">— {{ ev.reason }}</span> }
+                    <span class="event-time" [title]="ev.created_at">{{ formatRelativeTime(ev.created_at) }}</span>
+                  </li>
+                }
+              </ul>
+            } @else {
+              <p class="detail-events-empty">{{ accountEvents().length === 0 ? '暫無記錄' : '此類型無記錄' }}</p>
+            }
+          </div>
+
           <!-- 设备信息 -->
           <div class="detail-section">
             <h4>🔧 设备信息</h4>
@@ -898,13 +930,13 @@ export const PROXY_TYPES = [
 
         <!-- 登入進度指示（詳情面板） -->
         @if (isLoggingIn(selectedAccount()!.id) || selectedAccount()!.status === 'Logging in...' || selectedAccount()!.status === 'Waiting Code' || selectedAccount()!.status === 'Waiting 2FA') {
-          <div class="detail-login-progress">
+          <div class="detail-login-progress" (click)="openLoginModal(selectedAccount()!)" style="cursor: pointer;">
             <div class="login-spinner"></div>
             <span class="login-progress-text">
               @switch (selectedAccount()!.status) {
-                @case ('Logging in...') { 正在連接 Telegram 服務器... }
-                @case ('Waiting Code') { 等待輸入驗證碼... }
-                @case ('Waiting 2FA') { 等待輸入兩步驟驗證密碼... }
+                @case ('Logging in...') { 正在連接中...（點擊查看） }
+                @case ('Waiting Code') { 需要驗證碼（點擊輸入） }
+                @case ('Waiting 2FA') { 需要二步驗證（點擊輸入） }
                 @default { {{ getLoginProgress(selectedAccount()!.id)?.step || '處理中...' }} }
               }
             </span>
@@ -914,10 +946,10 @@ export const PROXY_TYPES = [
         <!-- 操作按钮 -->
         <div class="detail-actions-grid">
           @if (canLogin(selectedAccount()!) && !isLoggingIn(selectedAccount()!.id)) {
-            <button (click)="onLogin(selectedAccount()!)" class="action-btn-sm primary">▶️ 登入</button>
+            <button (click)="openLoginModal(selectedAccount()!)" class="action-btn-sm primary">▶️ 登入</button>
           }
           @if (isLoggingIn(selectedAccount()!.id) || selectedAccount()!.status === 'Logging in...' || selectedAccount()!.status === 'Waiting Code' || selectedAccount()!.status === 'Waiting 2FA') {
-            <button class="action-btn-sm logging-in" disabled>⏳ 登入中...</button>
+            <button class="action-btn-sm logging-in" (click)="openLoginModal(selectedAccount()!)">⏳ 登入中...</button>
           }
           @if (selectedAccount()!.status === 'Online') {
             <button (click)="onLogout(selectedAccount()!)" class="action-btn-sm warning">⏹️ 退出</button>
@@ -1369,6 +1401,200 @@ export const PROXY_TYPES = [
           <button (click)="applyBatchEdit()" class="btn-save" [disabled]="batchSaving()">
             {{ batchSaving() ? '应用中...' : '✓ 应用到 ' + selectedIds.size + ' 個账号' }}
           </button>
+        </div>
+      </div>
+    }
+
+    <!-- 登入帳號彈窗 -->
+    @if (showLoginModal()) {
+      <div class="modal-overlay" (click)="closeLoginModal()"></div>
+      <div class="modal-container login-modal">
+        <div class="modal-header">
+          <h3>
+            @switch (loginStep()) {
+              @case ('connecting') { 🔄 正在連接 }
+              @case ('code') { 📲 驗證碼登入 }
+              @case ('2fa') { 🔐 二步驗證 }
+              @case ('success') { ✅ 登入成功 }
+              @case ('error') { ❌ 登入失敗 }
+            }
+          </h3>
+          <button (click)="closeLoginModal()" class="close-btn">×</button>
+        </div>
+
+        <div class="modal-content login-modal-content">
+          @if (loginModalAccount(); as acc) {
+            <div class="login-modal-phone">{{ acc.phone }}</div>
+
+            @switch (loginStep()) {
+              @case ('connecting') {
+                <div class="login-modal-center">
+                  <div class="login-spinner large"></div>
+                  <p class="login-modal-hint">正在嘗試連接 Telegram 伺服器...</p>
+                  <p class="login-modal-sub">這可能需要幾秒鐘</p>
+                </div>
+              }
+
+              @case ('code') {
+                <div class="login-modal-form">
+                  <div class="code-sent-banner">
+                    <span>✅</span>
+                    <span>驗證碼已發送至 Telegram App</span>
+                  </div>
+                  <div class="form-group">
+                    <label>驗證碼</label>
+                    <input type="text"
+                      class="code-input-large"
+                      placeholder="請輸入 6 位驗證碼"
+                      maxlength="6"
+                      autofocus
+                      [(ngModel)]="loginVerificationCode"
+                      (keydown.enter)="submitLoginCode()">
+                    <span class="input-hint">請查看 Telegram App 中收到的驗證碼</span>
+                  </div>
+                  <div class="login-modal-actions">
+                    @if (loginResendCooldown() > 0) {
+                      <span class="resend-countdown">{{ loginResendCooldown() }}s 後可重發</span>
+                    } @else {
+                      <button (click)="resendLoginCode()" class="btn-text">重新發送驗證碼</button>
+                    }
+                  </div>
+                </div>
+              }
+
+              @case ('2fa') {
+                <div class="login-modal-form">
+                  <div class="form-group">
+                    <label>二步驗證密碼</label>
+                    <input type="password"
+                      class="form-input"
+                      placeholder="請輸入二步驗證密碼"
+                      autofocus
+                      [(ngModel)]="loginTwoFactorPassword"
+                      (keydown.enter)="submitLoginCode()">
+                    <span class="input-hint">此帳號啟用了兩步驗證，請輸入密碼</span>
+                  </div>
+                </div>
+              }
+
+              @case ('success') {
+                <div class="login-modal-center">
+                  <div class="login-success-icon">✅</div>
+                  <p class="login-modal-hint">帳號已成功上線</p>
+                </div>
+              }
+
+              @case ('error') {
+                <div class="login-modal-center">
+                  <div class="login-error-icon">⚠️</div>
+                  <p class="login-modal-error">{{ loginErrorMessage() }}</p>
+                </div>
+              }
+            }
+          }
+        </div>
+
+        <div class="modal-footer">
+          @switch (loginStep()) {
+            @case ('connecting') {
+              <button (click)="closeLoginModal()" class="btn-cancel">取消</button>
+            }
+            @case ('code') {
+              <button (click)="closeLoginModal()" class="btn-cancel">取消</button>
+              <button (click)="submitLoginCode()"
+                class="btn-save"
+                [disabled]="!loginVerificationCode || loginSubmitting()">
+                {{ loginSubmitting() ? '驗證中...' : '確認登入' }}
+              </button>
+            }
+            @case ('2fa') {
+              <button (click)="closeLoginModal()" class="btn-cancel">取消</button>
+              <button (click)="submitLoginCode()"
+                class="btn-save"
+                [disabled]="!loginTwoFactorPassword || loginSubmitting()">
+                {{ loginSubmitting() ? '驗證中...' : '確認登入' }}
+              </button>
+            }
+            @case ('success') {
+              <button (click)="closeLoginModal()" class="btn-save">完成</button>
+            }
+            @case ('error') {
+              <button (click)="closeLoginModal()" class="btn-cancel">關閉</button>
+              <button (click)="retryLogin()" class="btn-save">重試</button>
+            }
+          }
+        </div>
+      </div>
+    }
+
+    <!-- P1-4: 批量登入結果彈窗 -->
+    @if (showBatchLoginModal()) {
+      <div class="modal-overlay" (click)="closeBatchLoginModal()"></div>
+      <div class="modal-container batch-login-modal">
+        <div class="modal-header">
+          <h3>📋 批量登入結果</h3>
+          <button (click)="closeBatchLoginModal()" class="close-btn">×</button>
+        </div>
+        <div class="modal-content batch-login-content">
+          <p class="batch-login-summary">
+            共 {{ batchLoginTotal() }} 個帳號 ·
+            @if (batchLoggingIn()) { 正在發送請求... }
+            @else { 已全部發送 }
+          </p>
+          <div class="batch-login-stats">
+            <div class="batch-stat success">
+              <span class="stat-num">{{ batchLoginSuccessIds().length }}</span>
+              <span class="stat-label">成功</span>
+            </div>
+            <div class="batch-stat need-code">
+              <span class="stat-num">{{ batchLoginNeedCodeIds().length }}</span>
+              <span class="stat-label">需驗證碼</span>
+            </div>
+            <div class="batch-stat failed">
+              <span class="stat-num">{{ batchLoginFailed().length }}</span>
+              <span class="stat-label">失敗</span>
+            </div>
+          </div>
+          @if (batchLoginNeedCodeIds().length > 0) {
+            <div class="batch-login-section">
+              <div class="batch-need-code-header">
+                <h4>📲 需要輸入驗證碼</h4>
+                @if (batchLoginNeedCodeIds().length > 1) {
+                  <!-- P2-5: 一鍵逐個補驗證碼 -->
+                  <button
+                    type="button"
+                    class="btn-batch-fill-code"
+                    (click)="startBatchCodeQueue()"
+                    title="依序打開每個帳號的驗證碼輸入視窗"
+                  >⚡ 逐個輸入 ({{ batchLoginNeedCodeIds().length }})</button>
+                }
+              </div>
+              <ul class="batch-account-list">
+                @for (id of batchLoginNeedCodeIds(); track id) {
+                  @if (getAccountById(id); as acc) {
+                    <li>
+                      <button type="button" class="batch-account-btn" (click)="openLoginModal(acc)">
+                        {{ acc.phone }}
+                      </button>
+                    </li>
+                  }
+                }
+              </ul>
+            </div>
+          }
+          @if (batchLoginFailed().length > 0) {
+            <div class="batch-login-section">
+              <h4>❌ 登入失敗</h4>
+              <ul class="batch-failed-list">
+                @for (item of batchLoginFailed(); track item.accountId) {
+                  <li><span class="phone">{{ item.phone }}</span> — {{ item.message }}</li>
+                }
+              </ul>
+            </div>
+          }
+        </div>
+        <div class="modal-footer">
+          <button (click)="closeBatchLoginModal()" class="btn-save">關閉</button>
         </div>
       </div>
     }
@@ -2258,10 +2484,25 @@ export const PROXY_TYPES = [
       background: #f59e0b;
       animation: pulse-warning 2s ease-in-out infinite;
     }
+    .status-dot.connecting {
+      background: #06b6d4;
+      animation: pulse-connecting 1s ease-in-out infinite;
+    }
+    .status-dot.disconnected {
+      background: #f97316;
+    }
+    .status-dot.error {
+      background: #ef4444;
+    }
 
     @keyframes pulse-online {
       0%, 100% { opacity: 1; transform: scale(1); }
       50% { opacity: 0.7; transform: scale(1.1); }
+    }
+
+    @keyframes pulse-connecting {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.8); }
     }
 
     @keyframes pulse-banned {
@@ -2401,8 +2642,12 @@ export const PROXY_TYPES = [
 
     .action-btn.logging-in {
       background: rgba(6, 182, 212, 0.2);
-      cursor: not-allowed;
-      opacity: 0.8;
+      cursor: pointer;
+      opacity: 0.9;
+    }
+    .action-btn.logging-in:hover {
+      background: rgba(6, 182, 212, 0.3);
+      opacity: 1;
     }
 
     .action-btn:disabled {
@@ -2436,6 +2681,263 @@ export const PROXY_TYPES = [
       z-index: 10;
       border-radius: 0.75rem;
     }
+
+    .overlay-cancel-btn {
+      margin-top: 0.25rem;
+      padding: 0.25rem 0.75rem;
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 0.375rem;
+      background: transparent;
+      color: rgba(255,255,255,0.6);
+      font-size: 0.75rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .overlay-cancel-btn:hover { color: #fff; border-color: rgba(255,255,255,0.4); }
+
+    /* ===== 登入彈窗樣式 ===== */
+    .login-modal { max-width: 420px; }
+
+    .login-modal-content {
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .login-modal-phone {
+      text-align: center;
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #e2e8f0;
+      padding: 0.5rem;
+      background: rgba(6, 182, 212, 0.1);
+      border-radius: 0.5rem;
+      letter-spacing: 0.05em;
+    }
+
+    .login-modal-center {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 1.5rem 0;
+    }
+
+    .login-spinner.large {
+      width: 48px;
+      height: 48px;
+      border-width: 4px;
+    }
+
+    .login-modal-hint {
+      color: #94a3b8;
+      font-size: 0.9rem;
+      text-align: center;
+    }
+
+    .login-modal-sub {
+      color: #64748b;
+      font-size: 0.8rem;
+      text-align: center;
+    }
+
+    .login-modal-error {
+      color: #f87171;
+      font-size: 0.9rem;
+      text-align: center;
+      line-height: 1.5;
+    }
+
+    .login-success-icon, .login-error-icon {
+      font-size: 2.5rem;
+    }
+
+    .login-modal-form {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .code-sent-banner {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.625rem 0.75rem;
+      background: rgba(34, 197, 94, 0.1);
+      border: 1px solid rgba(34, 197, 94, 0.25);
+      border-radius: 0.5rem;
+      color: #4ade80;
+      font-size: 0.85rem;
+    }
+
+    .code-input-large {
+      width: 100%;
+      padding: 0.75rem;
+      background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));
+      border: 1px solid var(--border-default, rgba(148, 163, 184, 0.2));
+      border-radius: 0.5rem;
+      color: var(--text-primary, white);
+      font-size: 1.5rem;
+      letter-spacing: 0.5rem;
+      text-align: center;
+      transition: border-color 0.2s;
+      outline: none;
+    }
+    .code-input-large:focus {
+      border-color: var(--primary, #06b6d4);
+      box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.15);
+    }
+
+    .login-modal-actions {
+      display: flex;
+      justify-content: center;
+    }
+
+    .resend-countdown {
+      color: #64748b;
+      font-size: 0.85rem;
+    }
+
+    .btn-text {
+      background: none;
+      border: none;
+      color: #06b6d4;
+      cursor: pointer;
+      font-size: 0.85rem;
+      padding: 0.25rem 0.5rem;
+      transition: color 0.2s;
+    }
+    .btn-text:hover { color: #22d3ee; }
+
+    .input-hint {
+      display: block;
+      margin-top: 0.375rem;
+      font-size: 0.75rem;
+      color: var(--text-muted, #64748b);
+    }
+
+    /* P1-4: 批量登入結果彈窗 */
+    .batch-login-modal { max-width: 480px; }
+    .batch-login-content { padding: 1rem 1.5rem; }
+    .batch-login-summary {
+      color: #94a3b8;
+      font-size: 0.9rem;
+      margin-bottom: 1rem;
+    }
+    .batch-login-stats {
+      display: flex;
+      gap: 1.5rem;
+      margin-bottom: 1.25rem;
+    }
+    .batch-stat {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.25rem;
+    }
+    .batch-stat .stat-num { font-size: 1.5rem; font-weight: 700; }
+    .batch-stat.success .stat-num { color: #22c55e; }
+    .batch-stat.need-code .stat-num { color: #06b6d4; }
+    .batch-stat.failed .stat-num { color: #f87171; }
+    .batch-stat .stat-label { font-size: 0.75rem; color: #64748b; }
+    .batch-login-section {
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 1px solid rgba(148, 163, 184, 0.2);
+    }
+    .batch-login-section h4 { font-size: 0.9rem; margin-bottom: 0.5rem; color: #e2e8f0; }
+    .batch-account-list, .batch-failed-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .batch-account-list li, .batch-failed-list li { margin-bottom: 0.35rem; }
+    .batch-account-btn {
+      background: none;
+      border: none;
+      color: #06b6d4;
+      cursor: pointer;
+      font-size: 0.875rem;
+      padding: 0.2rem 0;
+      text-align: left;
+      transition: color 0.2s;
+    }
+    .batch-account-btn:hover { color: #22d3ee; text-decoration: underline; }
+    .batch-failed-list .phone { color: #94a3b8; margin-right: 0.25rem; }
+    .batch-failed-list li { font-size: 0.85rem; color: #f87171; }
+
+    /* P1-5 + P2-3: 詳情面板最近事件 */
+    .detail-events-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+    .detail-events-header h4 { margin: 0; }
+    .event-filter-tabs {
+      display: flex;
+      gap: 0.25rem;
+      flex-wrap: wrap;
+    }
+    .event-filter-tab {
+      background: rgba(148, 163, 184, 0.1);
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      border-radius: 10px;
+      color: #94a3b8;
+      cursor: pointer;
+      font-size: 0.7rem;
+      padding: 0.15rem 0.5rem;
+      transition: all 0.15s;
+    }
+    .event-filter-tab:hover { background: rgba(6, 182, 212, 0.15); color: #06b6d4; }
+    .event-filter-tab.active { background: rgba(6, 182, 212, 0.2); border-color: #06b6d4; color: #06b6d4; font-weight: 600; }
+    .detail-events-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      font-size: 0.8rem;
+    }
+    .detail-events-list li {
+      padding: 0.35rem 0;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+      align-items: center;
+    }
+    .detail-events-list .event-type { font-weight: 500; }
+    .detail-events-list .event-type-login    { color: #4ade80; }
+    .detail-events-list .event-type-logout   { color: #94a3b8; }
+    .detail-events-list .event-type-disconnect { color: #f87171; }
+    .detail-events-list .event-type-expired  { color: #fb923c; }
+    .detail-events-list .event-type-reconnect { color: #06b6d4; }
+    .detail-events-list .event-reason { color: #94a3b8; font-size: 0.75rem; }
+    .detail-events-list .event-time { color: #64748b; margin-left: auto; font-size: 0.75rem; }
+    .detail-events-empty { color: #64748b; font-size: 0.85rem; margin: 0; }
+
+    /* P2-5: 批量補碼一鍵按鈕 */
+    .batch-need-code-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0.5rem;
+    }
+    .batch-need-code-header h4 { margin: 0; font-size: 0.9rem; color: #e2e8f0; }
+    .btn-batch-fill-code {
+      background: linear-gradient(135deg, #06b6d4, #0e7490);
+      border: none;
+      border-radius: 6px;
+      color: #fff;
+      cursor: pointer;
+      font-size: 0.8rem;
+      font-weight: 600;
+      padding: 0.3rem 0.75rem;
+      transition: opacity 0.2s;
+    }
+    .btn-batch-fill-code:hover { opacity: 0.85; }
 
     .login-spinner {
       width: 32px;
@@ -4056,9 +4558,38 @@ export class AccountCardListComponent implements OnInit, OnChanges, OnDestroy {
   batchLoggingIn = signal(false);
   batchLoggingOut = signal(false);
 
+  // P1-4: 批量登入進度
+  showBatchLoginModal = signal(false);
+  batchLoginTotal = signal(0);
+  batchLoginSuccessIds = signal<number[]>([]);
+  batchLoginNeedCodeIds = signal<number[]>([]);
+  batchLoginFailed = signal<{ accountId: number; phone: string; message: string }[]>([]);
+
+  // P1-5: 帳號事件記錄（詳情面板）
+  accountEvents = signal<{ event_type: string; reason: string; created_at: string }[]>([]);
+
+  // P2-3: 事件篩選
+  accountEventsFilter = signal<'all' | 'login' | 'logout' | 'disconnect' | 'session_expired' | 'reconnect_ok'>('all');
+
+  // P2-5: 批量補驗證碼隊列
+  batchCodeQueue = signal<number[]>([]);  // 待補碼帳號 ID 隊列
+
   // 登入狀態追踪
   loggingInAccounts = signal<Set<number>>(new Set());
   loginProgress = signal<Map<number, { step: string; progress: number }>>(new Map());
+  
+  // 登入彈窗狀態
+  showLoginModal = signal(false);
+  loginModalAccount = signal<Account | null>(null);
+  loginStep = signal<'connecting' | 'code' | '2fa' | 'success' | 'error'>('connecting');
+  loginVerificationCode = '';
+  loginTwoFactorPassword = '';
+  loginPhoneCodeHash = '';
+  loginSubmitting = signal(false);
+  loginErrorMessage = signal('');
+  loginResendCooldown = signal(0);
+  private loginTimeout: any = null;
+  private loginResendTimer: any = null;
 
   // 标签和分組状态
   showTagFilter = signal(false);
@@ -4229,28 +4760,101 @@ export class AccountCardListComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   ngOnDestroy(): void {
-    // 清理 IPC 監聽器
     this.ipcChannels.forEach(channel => {
       this.ipcService.cleanup(channel);
     });
+    this.clearLoginTimeout();
+    if (this.loginResendTimer) {
+      clearInterval(this.loginResendTimer);
+    }
   }
 
   setupLoginStatusListeners(): void {
-    // 監聽登入錯誤事件
     this.ipcService.on('account-login-error', (data: any) => {
       if (data.accountId) {
         this.onLoginComplete(data.accountId);
+        if (this.batchLoggingIn()) {
+          const ids = this.batchLoginSuccessIds().concat(this.batchLoginNeedCodeIds());
+          if (!ids.includes(data.accountId)) {
+            const acc = this.accounts.find(a => a.id === data.accountId);
+            this.batchLoginFailed.set([
+              ...this.batchLoginFailed(),
+              { accountId: data.accountId, phone: acc?.phone ?? String(data.accountId), message: data.friendlyMessage || data.message || '登入失敗' }
+            ]);
+          }
+        }
+        const modalAcc = this.loginModalAccount();
+        if (modalAcc && modalAcc.id === data.accountId) {
+          this.clearLoginTimeout();
+          this.loginSubmitting.set(false);
+          this.loginErrorMessage.set(
+            data.friendlyMessage || data.message || '登入失敗，請稍後重試'
+          );
+          this.loginStep.set('error');
+        }
       }
     });
     this.ipcChannels.push('account-login-error');
 
-    // 監聽登入成功事件
     this.ipcService.on('login-success', (data: any) => {
       if (data.accountId) {
         this.onLoginComplete(data.accountId);
+        if (this.batchLoggingIn()) {
+          if (!this.batchLoginSuccessIds().includes(data.accountId)) {
+            this.batchLoginSuccessIds.set([...this.batchLoginSuccessIds(), data.accountId]);
+          }
+        }
+        const modalAcc = this.loginModalAccount();
+        if (modalAcc && modalAcc.id === data.accountId) {
+          this.clearLoginTimeout();
+          this.loginSubmitting.set(false);
+          this.loginStep.set('success');
+          setTimeout(() => this.closeLoginModal(), 1500);
+        }
       }
     });
     this.ipcChannels.push('login-success');
+
+    this.ipcService.on('login-requires-code', (data: any) => {
+      if (data.accountId && data.phoneCodeHash) {
+        if (this.batchLoggingIn() && !this.batchLoginSuccessIds().includes(data.accountId)) {
+          if (!this.batchLoginNeedCodeIds().includes(data.accountId)) {
+            this.batchLoginNeedCodeIds.set([...this.batchLoginNeedCodeIds(), data.accountId]);
+          }
+        }
+        const modalAcc = this.loginModalAccount();
+        if (modalAcc && modalAcc.id === data.accountId) {
+          this.clearLoginTimeout();
+          this.loginPhoneCodeHash = data.phoneCodeHash;
+          this.loginSubmitting.set(false);
+          this.loginStep.set('code');
+          this.startLoginResendCooldown();
+          this.toast.success('驗證碼已發送');
+        }
+        if (!this.showLoginModal()) {
+          const acc = this.accounts.find(a => a.id === data.accountId);
+          if (acc) {
+            this.loginModalAccount.set(acc);
+            this.loginPhoneCodeHash = data.phoneCodeHash;
+            this.loginStep.set('code');
+            this.showLoginModal.set(true);
+            this.startLoginResendCooldown();
+          }
+        }
+      }
+    });
+    this.ipcChannels.push('login-requires-code');
+
+    this.ipcService.on('login-requires-2fa', (data: any) => {
+      const modalAcc = this.loginModalAccount();
+      if (modalAcc && data.accountId === modalAcc.id) {
+        this.clearLoginTimeout();
+        this.loginSubmitting.set(false);
+        this.loginStep.set('2fa');
+        this.toast.info('請輸入二步驗證密碼');
+      }
+    });
+    this.ipcChannels.push('login-requires-2fa');
   }
 
   loadTagsAndGroups(): void {
@@ -4292,6 +4896,10 @@ export class AccountCardListComponent implements OnInit, OnChanges, OnDestroy {
     return fullName || account.phone;
   }
 
+  getAccountById(id: number): Account | undefined {
+    return this.accounts.find(a => a.id === id);
+  }
+
   getStatusClass(status: string): string {
     switch (status) {
       case 'Online': return 'online';
@@ -4300,18 +4908,36 @@ export class AccountCardListComponent implements OnInit, OnChanges, OnDestroy {
       case 'Warming Up':
       case 'Cooldown':
         return 'warning';
+      case 'Logging in...':
+      case 'Waiting Code':
+      case 'Waiting 2FA':
+        return 'connecting';
+      case 'Disconnected':
+      case 'Session Expired':
+      case 'Auth Error':
+        return 'disconnected';
+      case 'Proxy Error':
+      case 'Error':
+        return 'error';
       default: return 'offline';
     }
   }
 
   getStatusText(status: string): string {
     switch (status) {
-      case 'Online': return '在线';
-      case 'Offline': return '离线';
+      case 'Online': return '在線';
+      case 'Offline': return '離線';
+      case 'Disconnected': return '已斷開';
       case 'Banned': return '封禁';
-      case 'Warming Up': return '预热中';
-      case 'Cooldown': return '冷却中';
-      case 'Proxy Error': return '代理错误';
+      case 'Warming Up': return '預熱中';
+      case 'Cooldown': return '冷卻中';
+      case 'Proxy Error': return '代理錯誤';
+      case 'Logging in...': return '連接中';
+      case 'Waiting Code': return '待驗證';
+      case 'Waiting 2FA': return '待二步驗證';
+      case 'Session Expired': return 'Session 過期';
+      case 'Auth Error': return '認證失敗';
+      case 'Error': return '錯誤';
       default: return status;
     }
   }
@@ -4358,6 +4984,94 @@ export class AccountCardListComponent implements OnInit, OnChanges, OnDestroy {
   selectAccount(account: Account): void {
     this.selectedAccount.set(account);
     this.accountSelected.emit(account);
+    this.loadAccountEvents(account.id);
+  }
+
+  loadAccountEvents(accountId: number): void {
+    this.accountEvents.set([]);
+    this.accountEventsFilter.set('all');
+    this.ipcService.once('get-account-events-result', (result: any) => {
+      if (result.success && result.events && result.accountId === accountId) {
+        this.accountEvents.set(result.events);
+      }
+    });
+    this.ipcService.send('get-account-events', { accountId, limit: 50 });
+  }
+
+  // P2-3: 篩選後的事件列表
+  filteredAccountEvents(): { event_type: string; reason: string; created_at: string }[] {
+    const filter = this.accountEventsFilter();
+    const events = this.accountEvents();
+    if (filter === 'all') return events;
+    return events.filter(ev => ev.event_type === filter);
+  }
+
+  // P2-3: 相對時間格式化
+  formatRelativeTime(dateStr: string): string {
+    if (!dateStr) return '';
+    try {
+      const date = new Date(dateStr.replace(' ', 'T'));
+      const now = new Date();
+      const diffMs = now.getTime() - date.getTime();
+      const diffSec = Math.floor(diffMs / 1000);
+      if (diffSec < 60) return '剛剛';
+      const diffMin = Math.floor(diffSec / 60);
+      if (diffMin < 60) return `${diffMin} 分鐘前`;
+      const diffHr = Math.floor(diffMin / 60);
+      if (diffHr < 24) return `${diffHr} 小時前`;
+      const diffDay = Math.floor(diffHr / 24);
+      if (diffDay < 30) return `${diffDay} 天前`;
+      return dateStr.slice(0, 16).replace('T', ' ');
+    } catch {
+      return dateStr.slice(0, 16);
+    }
+  }
+
+  // P2-3: 事件標籤（含圖示）
+  getAccountEventLabel(eventType: string): string {
+    const map: Record<string, string> = {
+      login: '🔑 登入',
+      logout: '🚪 登出',
+      disconnect: '📵 斷開',
+      session_expired: '⚠️ Session 過期',
+      reconnect_ok: '🔄 重連成功'
+    };
+    return map[eventType] || eventType;
+  }
+
+  // P2-3: 事件類型顏色 class
+  getEventTypeClass(eventType: string): string {
+    const map: Record<string, string> = {
+      login: 'event-type-login',
+      logout: 'event-type-logout',
+      disconnect: 'event-type-disconnect',
+      session_expired: 'event-type-expired',
+      reconnect_ok: 'event-type-reconnect'
+    };
+    return map[eventType] || '';
+  }
+
+  // P2-5: 啟動逐個補驗證碼隊列
+  startBatchCodeQueue(): void {
+    const queue = [...this.batchLoginNeedCodeIds()];
+    if (queue.length === 0) return;
+    this.batchCodeQueue.set(queue);
+    this.openNextFromCodeQueue();
+  }
+
+  // P2-5: 打開隊列中下一個需要驗證碼的帳號
+  openNextFromCodeQueue(): void {
+    const queue = this.batchCodeQueue();
+    if (queue.length === 0) return;
+    const [nextId, ...rest] = queue;
+    this.batchCodeQueue.set(rest);
+    const acc = this.getAccountById(nextId);
+    if (acc) {
+      this.openLoginModal(acc);
+    } else {
+      // 帳號找不到，跳過
+      this.openNextFromCodeQueue();
+    }
   }
 
   closeDetail(): void {
@@ -4470,15 +5184,15 @@ export class AccountCardListComponent implements OnInit, OnChanges, OnDestroy {
       'error',
       'Proxy Error',
       'Session Expired',
-      'Auth Error'
+      'Auth Error',
+      'Disconnected'
     ];
-    // 不是在線狀態且不是登入中狀態
     const isNotOnline = account.status !== 'Online';
     const isNotLoggingIn = !['Logging in...', 'Waiting Code', 'Waiting 2FA'].includes(account.status);
-    // 狀態在允許登入列表中，或者狀態包含 'error'（不區分大小寫）
     const isAllowedStatus = loginAllowedStatuses.includes(account.status) || 
                            account.status.toLowerCase().includes('error') ||
-                           account.status.toLowerCase().includes('offline');
+                           account.status.toLowerCase().includes('offline') ||
+                           account.status.toLowerCase().includes('disconnected');
     return isNotOnline && isNotLoggingIn && isAllowedStatus;
   }
 
@@ -4498,7 +5212,6 @@ export class AccountCardListComponent implements OnInit, OnChanges, OnDestroy {
     this.loginProgress.set(progressMap);
   }
 
-  // 登入完成（成功或失敗）
   onLoginComplete(accountId: number): void {
     const loggingIn = new Set(this.loggingInAccounts());
     loggingIn.delete(accountId);
@@ -4507,6 +5220,160 @@ export class AccountCardListComponent implements OnInit, OnChanges, OnDestroy {
     const progress = new Map(this.loginProgress());
     progress.delete(accountId);
     this.loginProgress.set(progress);
+  }
+
+  // ===== 登入彈窗方法 =====
+
+  openLoginModal(account: Account): void {
+    this.loginModalAccount.set(account);
+    this.loginVerificationCode = '';
+    this.loginTwoFactorPassword = '';
+    this.loginPhoneCodeHash = '';
+    this.loginSubmitting.set(false);
+    this.loginErrorMessage.set('');
+    this.loginResendCooldown.set(0);
+    this.loginStep.set('connecting');
+    this.showLoginModal.set(true);
+
+    if (!this.isLoggingIn(account.id)) {
+      this.onLogin(account);
+    }
+
+    this.loginTimeout = setTimeout(() => {
+      if (this.loginStep() === 'connecting') {
+        this.loginErrorMessage.set('連接超時，請檢查網路或代理設定後重試');
+        this.loginStep.set('error');
+        this.onLoginComplete(account.id);
+        this.ipcService.send('update-account-status', { accountId: account.id, status: 'Offline' });
+      }
+    }, 30000);
+  }
+
+  closeLoginModal(): void {
+    const acc = this.loginModalAccount();
+    if (acc && this.loginStep() === 'connecting') {
+      this.cancelLogin(acc);
+    }
+    this.clearLoginTimeout();
+    this.showLoginModal.set(false);
+    this.loginModalAccount.set(null);
+    if (this.loginResendTimer) {
+      clearInterval(this.loginResendTimer);
+      this.loginResendTimer = null;
+    }
+    // P2-5: 若在逐個補碼隊列模式，自動打開下一個
+    if (this.batchCodeQueue().length > 0) {
+      setTimeout(() => this.openNextFromCodeQueue(), 300);
+    }
+  }
+
+  submitLoginCode(): void {
+    const acc = this.loginModalAccount();
+    if (!acc) return;
+
+    if (this.loginStep() === 'code') {
+      if (!this.loginVerificationCode || !this.loginPhoneCodeHash) return;
+      this.loginSubmitting.set(true);
+      this.ipcService.send('login-account', {
+        phone: acc.phone,
+        phoneCode: this.loginVerificationCode,
+        phoneCodeHash: this.loginPhoneCodeHash,
+        apiId: acc.apiId,
+        apiHash: acc.apiHash
+      });
+      this.loginTimeout = setTimeout(() => {
+        if (this.loginSubmitting()) {
+          this.loginSubmitting.set(false);
+          this.loginErrorMessage.set('驗證超時，請重試');
+          this.loginStep.set('error');
+        }
+      }, 30000);
+    } else if (this.loginStep() === '2fa') {
+      if (!this.loginTwoFactorPassword) return;
+      this.loginSubmitting.set(true);
+      this.ipcService.send('login-account', {
+        phone: acc.phone,
+        phoneCode: this.loginVerificationCode,
+        phoneCodeHash: this.loginPhoneCodeHash,
+        twoFactorPassword: this.loginTwoFactorPassword,
+        apiId: acc.apiId,
+        apiHash: acc.apiHash
+      });
+      this.loginTimeout = setTimeout(() => {
+        if (this.loginSubmitting()) {
+          this.loginSubmitting.set(false);
+          this.loginErrorMessage.set('驗證超時，請重試');
+          this.loginStep.set('error');
+        }
+      }, 30000);
+    }
+  }
+
+  resendLoginCode(): void {
+    const acc = this.loginModalAccount();
+    if (!acc) return;
+    this.loginVerificationCode = '';
+    this.loginPhoneCodeHash = '';
+    this.loginStep.set('connecting');
+    this.ipcService.send('login-account', {
+      phone: acc.phone,
+      apiId: acc.apiId,
+      apiHash: acc.apiHash
+    });
+    this.toast.info('正在重新發送驗證碼...', 3000);
+    this.loginTimeout = setTimeout(() => {
+      if (this.loginStep() === 'connecting') {
+        this.loginErrorMessage.set('發送驗證碼超時，請重試');
+        this.loginStep.set('error');
+      }
+    }, 30000);
+  }
+
+  retryLogin(): void {
+    const acc = this.loginModalAccount();
+    if (!acc) return;
+    this.loginStep.set('connecting');
+    this.loginVerificationCode = '';
+    this.loginTwoFactorPassword = '';
+    this.loginPhoneCodeHash = '';
+    this.loginSubmitting.set(false);
+    this.loginErrorMessage.set('');
+    this.onLogin(acc);
+    this.loginTimeout = setTimeout(() => {
+      if (this.loginStep() === 'connecting') {
+        this.loginErrorMessage.set('連接超時，請檢查網路或代理設定後重試');
+        this.loginStep.set('error');
+        this.onLoginComplete(acc.id);
+        this.ipcService.send('update-account-status', { accountId: acc.id, status: 'Offline' });
+      }
+    }, 30000);
+  }
+
+  cancelLogin(account: Account): void {
+    this.onLoginComplete(account.id);
+    this.ipcService.send('update-account-status', { accountId: account.id, status: 'Offline' });
+  }
+
+  private clearLoginTimeout(): void {
+    if (this.loginTimeout) {
+      clearTimeout(this.loginTimeout);
+      this.loginTimeout = null;
+    }
+  }
+
+  private startLoginResendCooldown(): void {
+    this.loginResendCooldown.set(60);
+    if (this.loginResendTimer) clearInterval(this.loginResendTimer);
+    this.loginResendTimer = setInterval(() => {
+      const val = this.loginResendCooldown();
+      if (val <= 1) {
+        this.loginResendCooldown.set(0);
+        clearInterval(this.loginResendTimer!);
+        this.loginResendTimer = null;
+      } else {
+        this.loginResendCooldown.set(val - 1);
+      }
+    }, 1000);
   }
 
   onLogout(account: Account): void {
@@ -5086,7 +5953,6 @@ export class AccountCardListComponent implements OnInit, OnChanges, OnDestroy {
       return;
     }
 
-    // 過濾出離線的帳號
     const offlineAccounts = this.accounts.filter(a => 
       this.selectedIds.has(a.id) && (a.status === 'Offline' || a.status === 'Banned')
     );
@@ -5097,34 +5963,39 @@ export class AccountCardListComponent implements OnInit, OnChanges, OnDestroy {
     }
 
     this.batchLoggingIn.set(true);
-    this.toast.info(`正在批量登入 ${offlineAccounts.length} 個帳號...`);
+    this.batchLoginTotal.set(offlineAccounts.length);
+    this.batchLoginSuccessIds.set([]);
+    this.batchLoginNeedCodeIds.set([]);
+    this.batchLoginFailed.set([]);
+    this.showBatchLoginModal.set(true);
 
-    // 添加到登入中列表
     const loggingIn = new Set(this.loggingInAccounts());
-    offlineAccounts.forEach(account => {
-      loggingIn.add(account.id);
-      // 依序發送登入請求（間隔 1 秒避免觸發限制）
-    });
+    offlineAccounts.forEach(account => loggingIn.add(account.id));
     this.loggingInAccounts.set(loggingIn);
 
-    // 逐個登入（間隔發送避免觸發 Flood Wait）
     let index = 0;
     const loginNext = () => {
       if (index >= offlineAccounts.length) {
         this.batchLoggingIn.set(false);
-        this.toast.success(`已發送 ${offlineAccounts.length} 個帳號的登入請求`);
+        this.toast.success(`已發送 ${offlineAccounts.length} 個登入請求，請在彈窗中查看結果`);
         return;
       }
 
       const account = offlineAccounts[index];
       this.accountLogin.emit(account);
       index++;
-
-      // 間隔 2 秒發送下一個請求
       setTimeout(loginNext, 2000);
     };
 
     loginNext();
+  }
+
+  closeBatchLoginModal(): void {
+    this.showBatchLoginModal.set(false);
+    this.batchLoginTotal.set(0);
+    this.batchLoginSuccessIds.set([]);
+    this.batchLoginNeedCodeIds.set([]);
+    this.batchLoginFailed.set([]);
   }
 
   batchLogout(): void {

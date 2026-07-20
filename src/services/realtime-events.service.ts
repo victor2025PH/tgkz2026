@@ -89,8 +89,17 @@ export class RealtimeEventsService implements OnDestroy {
    */
   private async initialize(): Promise<void> {
     try {
-      // 注册前端事件接收器
-      await this.ipc.invoke('events:register-receiver');
+      // 注册前端事件接收器（桌面版可能未註冊此 handler，靜默跳過）
+      try {
+        await this.ipc.invoke('events:register-receiver');
+      } catch (e: any) {
+        const msg = String((e?.message ?? e) ?? '');
+        if (msg.includes('No handler registered') || msg.includes('events:register-receiver')) {
+          // 桌面版無此 IPC，不視為失敗
+        } else {
+          throw e;
+        }
+      }
       
       // 监听来自后端的事件
       this.setupEventListener();
@@ -152,8 +161,12 @@ export class RealtimeEventsService implements OnDestroy {
       if (history && Array.isArray(history)) {
         this.recentEvents = history;
       }
-    } catch (error) {
-      console.error('[RealtimeEvents] Failed to fetch history:', error);
+    } catch (e: any) {
+      const msg = String((e?.message ?? e) ?? '');
+      if (msg.includes('No handler registered') || msg.includes('events:get-history')) {
+        return; // 桌面版無此 IPC，靜默跳過
+      }
+      console.error('[RealtimeEvents] Failed to fetch history:', e);
     }
   }
   

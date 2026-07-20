@@ -430,6 +430,21 @@ class InitStartupMixin:
         await db.initialize()
         await db.connect()
         
+        # Cleanup zombie login states from previous session
+        try:
+            all_accounts = await db.get_all_accounts()
+            zombie_statuses = ['Logging in...', 'Waiting Code', 'Waiting 2FA']
+            zombie_ids = [
+                acc['id'] for acc in all_accounts
+                if acc.get('status') in zombie_statuses
+            ]
+            if zombie_ids:
+                count = await db.batch_update_account_status(zombie_ids, 'Offline')
+                print(f"[Backend] Cleaned up {count} zombie account(s) stuck in login state", file=sys.stderr)
+                self.send_log(f"已清理 {count} 個卡在登入狀態的帳號", "info")
+        except Exception as e:
+            print(f"[Backend] Zombie cleanup error: {e}", file=sys.stderr)
+        
         # Initialize full-text search engine
         try:
             from config import DATABASE_PATH
@@ -906,9 +921,8 @@ class InitStartupMixin:
 
         total_init_time = time.time() - init_start_time
         print(f"[Backend] ========== Initialization complete in {total_init_time:.3f}s ==========", file=sys.stderr)
-        self.send_log(f"✓ 後端初始化完成 ({total_init_time:.2f}s)", "success")
-        # 🔧 顯式就緒事件：Electron 據此（而非第一條 stdout）判定後端真正可用
-        self.send_event("backend-ready", {"status": "ready", "init_seconds": round(total_init_time, 2)})
+        # 僅發送「核心初始化完成」；「後端初始化完成」改由 main.run() 在 HTTP API 啟動後發送，確保桌面版 8000 已就緒再顯示視窗
+        self.send_log(f"✓ 核心初始化完成 ({total_init_time:.2f}s)", "success")
         
         # 🆕 發送數據路徑信息到前端（便於調試）
         try:
@@ -1485,8 +1499,21 @@ class InitStartupMixin:
                 alert_callback=alert_callback,
                 check_interval_seconds=300  # 5 分钟检查一次
             )
+
+            # P2-2: 启动周期性健康分同步任务（将指标写回 DB healthScore）
+            async def _db_health_score_update(account_id: int, health_score: float):
+                try:
+                    await db.update_account(account_id, {"healthScore": health_score})
+                except Exception as e:
+                    print(f"[EnhancedHealthMonitor] DB update error for {account_id}: {e}", file=sys.stderr)
+
+            asyncio.ensure_future(
+                self.enhanced_health_monitor.start_periodic_sync(
+                    db_update_callback=_db_health_score_update
+                )
+            )
             
-            print("[Backend] Enhanced health monitor initialized", file=sys.stderr)
+            print("[Backend] Enhanced health monitor initialized (with periodic DB sync)", file=sys.stderr)
         except Exception as e:
             print(f"[Backend] Failed to initialize enhanced health monitor: {e}", file=sys.stderr)
             # Don't fail initialization if health monitor fails

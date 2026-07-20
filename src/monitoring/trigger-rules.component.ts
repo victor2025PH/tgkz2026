@@ -136,6 +136,33 @@ interface TriggerRule {
         </div>
       </div>
 
+      <!-- 🆕 P4-2: 主視圖模式切換 -->
+      <div class="flex items-center gap-1 mb-4 p-1 bg-slate-800/60 rounded-xl border border-slate-700/50 w-fit">
+        <button (click)="mainView.set('rules')"
+                class="px-4 py-2 rounded-lg text-sm font-medium transition-all"
+                [class.bg-amber-500]="mainView() === 'rules'"
+                [class.text-white]="mainView() === 'rules'"
+                [class.shadow-lg]="mainView() === 'rules'"
+                [class.text-slate-400]="mainView() !== 'rules'"
+                [class.hover:text-white]="mainView() !== 'rules'">
+          📋 規則列表
+        </button>
+        <button (click)="mainView.set('history')"
+                class="px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2"
+                [class.bg-purple-500]="mainView() === 'history'"
+                [class.text-white]="mainView() === 'history'"
+                [class.shadow-lg]="mainView() === 'history'"
+                [class.text-slate-400]="mainView() !== 'history'"
+                [class.hover:text-white]="mainView() !== 'history'">
+          📜 觸發歷史
+          @if (sessionLog().length > 0) {
+            <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-white/20">{{ sessionLog().length }}</span>
+          }
+        </button>
+      </div>
+
+      @if (mainView() === 'rules') {
+
       <!-- AI 自動聊天提示 -->
       @if (aiChatEnabled()) {
         <div class="mb-4 p-4 bg-gradient-to-r from-emerald-500/10 to-cyan-500/10 rounded-xl border border-emerald-500/30">
@@ -152,29 +179,218 @@ interface TriggerRule {
         </div>
       }
 
+      <!-- 🆕 Phase 3: 規則效果分析面板 -->
+      @if (rules().length > 0) {
+        <div class="mb-4 rounded-xl border overflow-hidden"
+             [class.border-amber-500/30]="sleepingRules().length > 0"
+             [class.border-slate-700/50]="sleepingRules().length === 0">
+          <!-- 折疊標題 -->
+          <button (click)="showAnalysisPanel.set(!showAnalysisPanel())"
+                  class="w-full flex items-center justify-between p-4 text-left transition-colors hover:bg-white/5"
+                  [class.bg-amber-500/5]="sleepingRules().length > 0"
+                  [class.bg-slate-800/50]="sleepingRules().length === 0">
+            <div class="flex items-center gap-3">
+              <span class="text-lg">📊</span>
+              <div>
+                <span class="font-medium text-white text-sm">規則效果分析</span>
+                @if (sleepingRules().length > 0) {
+                  <span class="ml-2 px-2 py-0.5 bg-amber-500/20 text-amber-400 text-xs rounded-full">
+                    {{ sleepingRules().length }} 條規則需注意
+                  </span>
+                } @else {
+                  <span class="ml-2 text-xs text-emerald-400">✓ 規則健康</span>
+                }
+              </div>
+            </div>
+            <div class="flex items-center gap-3">
+              <!-- 引擎健康分 -->
+              <div class="text-right">
+                <span class="text-lg font-bold"
+                      [class.text-emerald-400]="engineHealthScore() >= 70"
+                      [class.text-amber-400]="engineHealthScore() >= 40 && engineHealthScore() < 70"
+                      [class.text-red-400]="engineHealthScore() < 40">
+                  {{ engineHealthScore() }}
+                </span>
+                <span class="text-xs text-slate-500 ml-0.5">/ 100</span>
+              </div>
+              <svg class="w-4 h-4 text-slate-500 transition-transform"
+                   [class.rotate-180]="showAnalysisPanel()"
+                   viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </div>
+          </button>
+
+          @if (showAnalysisPanel()) {
+            <div class="p-4 border-t border-slate-700/50 space-y-4 bg-slate-800/30">
+
+              <!-- 引擎總體健康評分 -->
+              <div class="flex items-center gap-4 p-4 rounded-xl bg-slate-700/30">
+                <div class="text-center w-20 flex-shrink-0">
+                  <div class="text-3xl font-bold"
+                       [class.text-emerald-400]="engineHealthScore() >= 70"
+                       [class.text-amber-400]="engineHealthScore() >= 40 && engineHealthScore() < 70"
+                       [class.text-red-400]="engineHealthScore() < 40">
+                    {{ engineHealthScore() }}
+                  </div>
+                  <div class="text-xs text-slate-500 mt-0.5">規則引擎健康分</div>
+                </div>
+                <div class="flex-1">
+                  <div class="h-3 bg-slate-700 rounded-full overflow-hidden mb-2">
+                    <div class="h-3 rounded-full transition-all duration-700"
+                         [class.bg-emerald-500]="engineHealthScore() >= 70"
+                         [class.bg-amber-500]="engineHealthScore() >= 40 && engineHealthScore() < 70"
+                         [class.bg-red-500]="engineHealthScore() < 40"
+                         [style.width.%]="engineHealthScore()">
+                    </div>
+                  </div>
+                  <div class="grid grid-cols-3 gap-2 text-xs">
+                    <div class="text-center">
+                      <div class="font-medium text-white">{{ activeRules().length }}</div>
+                      <div class="text-slate-500">活躍規則</div>
+                    </div>
+                    <div class="text-center">
+                      <div class="font-medium text-cyan-400">{{ totalTriggerCount() }}</div>
+                      <div class="text-slate-500">總觸發次數</div>
+                    </div>
+                    <div class="text-center">
+                      <div class="font-medium text-purple-400">{{ averageSuccessRate() }}%</div>
+                      <div class="text-slate-500">平均命中率</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 兩列：沉睡規則 + 最佳規則 -->
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- 沉睡規則 -->
+                <div class="rounded-xl border p-4"
+                     [class.border-amber-500/30]="sleepingRules().length > 0"
+                     [class.border-slate-700/30]="sleepingRules().length === 0"
+                     [class.bg-amber-500/5]="sleepingRules().length > 0">
+                  <div class="flex items-center gap-2 mb-3">
+                    <span class="text-base">😴</span>
+                    <span class="text-sm font-medium text-white">沉睡規則</span>
+                    @if (sleepingRules().length > 0) {
+                      <span class="ml-auto px-2 py-0.5 bg-amber-500/20 text-amber-400 text-xs rounded-full">
+                        {{ sleepingRules().length }} 條
+                      </span>
+                    }
+                  </div>
+                  @if (sleepingRules().length === 0) {
+                    <p class="text-xs text-emerald-400">✓ 所有活躍規則均有效觸發</p>
+                  } @else {
+                    <div class="space-y-2">
+                      @for (rule of sleepingRules().slice(0, 3); track rule.id) {
+                        <div class="flex items-center justify-between py-1.5">
+                          <span class="text-sm text-white truncate flex-1 mr-2">{{ rule.name }}</span>
+                          <span class="text-xs text-amber-400 flex-shrink-0">
+                            {{ rule.triggerCount === 0 ? '從未觸發' : '7天未觸發' }}
+                          </span>
+                        </div>
+                      }
+                      @if (sleepingRules().length > 3) {
+                        <p class="text-xs text-slate-500">還有 {{ sleepingRules().length - 3 }} 條沉睡規則...</p>
+                      }
+                    </div>
+                    <div class="mt-3 p-2 rounded-lg bg-amber-500/10 text-xs text-amber-400/90">
+                      💡 建議：檢查關鍵詞集是否正確配置，或調整監控群組設置
+                    </div>
+                  }
+                </div>
+
+                <!-- 最佳表現規則 -->
+                <div class="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">
+                  <div class="flex items-center gap-2 mb-3">
+                    <span class="text-base">🏆</span>
+                    <span class="text-sm font-medium text-white">最佳表現規則</span>
+                  </div>
+                  @if (topPerformingRule()) {
+                    <div>
+                      <div class="font-medium text-white text-sm mb-1">{{ topPerformingRule()!.name }}</div>
+                      <div class="flex items-center gap-2 text-xs text-slate-400">
+                        <span>命中率</span>
+                        <div class="flex-1 h-1.5 bg-slate-700 rounded-full">
+                          <div class="h-1.5 bg-emerald-400 rounded-full"
+                               [style.width.%]="getRuleSuccessRate(topPerformingRule()!)"></div>
+                        </div>
+                        <span class="text-emerald-400 font-bold">
+                          {{ getRuleSuccessRate(topPerformingRule()!) }}%
+                        </span>
+                      </div>
+                      <div class="text-xs text-slate-500 mt-2">
+                        觸發 {{ topPerformingRule()!.triggerCount || 0 }} 次 ·
+                        成功 {{ topPerformingRule()!.successCount || 0 }} 次
+                      </div>
+                    </div>
+                  } @else {
+                    <p class="text-xs text-slate-400">尚無足夠數據</p>
+                  }
+                </div>
+              </div>
+
+              <!-- 優化建議 -->
+              @if (ruleOptimizationTips().length > 0) {
+                <div class="rounded-xl border border-blue-500/20 bg-blue-500/5 p-4">
+                  <div class="flex items-center gap-2 mb-2">
+                    <span class="text-sm">💡</span>
+                    <span class="text-sm font-medium text-white">優化建議</span>
+                  </div>
+                  <ul class="space-y-1.5">
+                    @for (tip of ruleOptimizationTips(); track tip) {
+                      <li class="flex items-start gap-2 text-xs text-slate-300">
+                        <span class="text-blue-400 flex-shrink-0 mt-0.5">→</span>
+                        {{ tip }}
+                      </li>
+                    }
+                  </ul>
+                </div>
+              }
+            </div>
+          }
+        </div>
+      }
+
       <!-- 主內容區 -->
       <div class="flex-1 overflow-hidden">
         <div class="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden h-full flex flex-col">
-          <div class="p-4 border-b border-slate-700/50 flex items-center justify-between">
-            <h3 class="font-semibold text-white flex items-center gap-2">
-              <span>⚡</span> 觸發規則列表
-              <span class="text-xs text-slate-500">({{ rules().length }})</span>
-            </h3>
-            <div class="flex items-center gap-2">
-              <select [(ngModel)]="filterStatus" 
+          <!-- 🆕 Phase 2: 場景分類標籤頁 + 狀態篩選 -->
+          <div class="p-4 border-b border-slate-700/50">
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="font-semibold text-white flex items-center gap-2">
+                <span>⚡</span> 觸發規則列表
+                <span class="text-xs text-slate-500">({{ scenedRules().length }}/{{ rules().length }})</span>
+              </h3>
+              <select [(ngModel)]="filterStatus"
                       class="px-3 py-1.5 bg-slate-700 border border-slate-600 rounded-lg text-sm text-white">
                 <option value="all">全部狀態</option>
                 <option value="active">活躍中</option>
                 <option value="inactive">已停用</option>
               </select>
             </div>
+            <!-- 場景分類標籤 -->
+            <div class="flex items-center gap-2 flex-wrap">
+              @for (tab of sceneTabs; track tab.value) {
+                <button (click)="sceneFilter.set(tab.value)"
+                        class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border"
+                        [class.text-white]="sceneFilter() === tab.value"
+                        [class.border-transparent]="sceneFilter() !== tab.value"
+                        [style.background-color]="sceneFilter() === tab.value ? tab.activeColor : 'transparent'"
+                        [style.border-color]="sceneFilter() === tab.value ? tab.activeColor : 'rgba(100,116,139,0.3)'"
+                        [style.color]="sceneFilter() === tab.value ? 'white' : '#94a3b8'">
+                  <span>{{ tab.icon }}</span>
+                  <span>{{ tab.label }}</span>
+                  <span class="ml-0.5 opacity-70">({{ getRuleCountForScene(tab.value) }})</span>
+                </button>
+              }
+            </div>
           </div>
           
           <!-- 規則列表 -->
           <div class="flex-1 overflow-y-auto p-4">
-            @if (filteredRules().length > 0) {
+            @if (scenedRules().length > 0) {
               <div class="space-y-4">
-                @for (rule of filteredRules(); track rule.id) {
+                @for (rule of scenedRules(); track rule.id) {
                   <div class="bg-slate-700/50 rounded-xl border transition-all hover:border-amber-500/30"
                        [class.border-slate-600/50]="rule.isActive"
                        [class.border-slate-700/50]="!rule.isActive"
@@ -188,7 +404,7 @@ interface TriggerRule {
                           <span class="text-lg">{{ getResponseIcon(rule.responseType) }}</span>
                         </div>
                         <div>
-                          <div class="flex items-center gap-2">
+                          <div class="flex items-center gap-2 flex-wrap">
                             <span class="font-medium text-white">{{ rule.name }}</span>
                             @if (rule.isActive) {
                               <span class="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 text-xs rounded-full">活躍</span>
@@ -204,6 +420,22 @@ interface TriggerRule {
                                   [class.text-slate-400]="rule.priority === 1">
                               {{ getPriorityLabel(rule.priority) }}
                             </span>
+                            <!-- 🆕 Phase 2: 命中率健康徽章 -->
+                            @if (rule.triggerCount && rule.triggerCount > 0) {
+                              <span class="flex items-center gap-1 px-2 py-0.5 text-xs rounded-full"
+                                    [class]="getRuleHealthClass(rule)"
+                                    [title]="'命中率: ' + getRuleSuccessRate(rule) + '% (' + rule.successCount + '/' + rule.triggerCount + '次)'">
+                                <span class="w-1.5 h-1.5 rounded-full inline-block"
+                                      [class.bg-emerald-400]="getRuleSuccessRate(rule) >= 70"
+                                      [class.bg-amber-400]="getRuleSuccessRate(rule) >= 30 && getRuleSuccessRate(rule) < 70"
+                                      [class.bg-red-400]="getRuleSuccessRate(rule) < 30"></span>
+                                {{ getRuleSuccessRate(rule) }}% 命中
+                              </span>
+                            } @else if (rule.triggerCount === 0 && rule.isActive) {
+                              <span class="px-2 py-0.5 bg-slate-600/50 text-slate-500 text-xs rounded-full" title="尚無觸發記錄">
+                                未觸發
+                              </span>
+                            }
                           </div>
                           <p class="text-sm text-slate-400 mt-0.5">{{ rule.description || '無描述' }}</p>
                           @if (rule.overlapWarning) {
@@ -283,20 +515,168 @@ interface TriggerRule {
               <div class="h-full flex items-center justify-center">
                 <app-empty-state iconKind="bolt"
                                  title="還沒有觸發規則"
-                                 description="觸發規則定義了當關鍵詞匹配後系統的響應方式。&#10;您可以為不同的關鍵詞設置不同的響應動作。"
+                                 description="觸發規則讓 AI 在偵測到特定關鍵詞時自動採取行動——回覆消息、發送模板、或開始私聊培育"
                                  ctaLabel="創建第一個規則"
                                  (cta)="openCreateWizard()">
                   @if (aiChatEnabled()) {
-                    <p class="text-sm mb-4" style="color: var(--success);">
-                      💡 AI 自動聊天已開啟，將作為默認響應方式
-                    </p>
+                    <div class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm mb-4"
+                         style="background: var(--success-bg); color: var(--success); border: 1px solid var(--success);">
+                      <span class="w-2 h-2 rounded-full animate-pulse" style="background: var(--success);"></span>
+                      AI 自動聊天已開啟，作為兜底響應方式
+                    </div>
                   }
+                  <!-- 使用場景示例（來自 main 的內容，統一 token 呈現） -->
+                  <div class="grid grid-cols-3 gap-3 max-w-lg mb-4 text-left">
+                    <div class="p-3 rounded-xl" style="background: var(--bg-card); border: 1px solid var(--border-default);">
+                      <div class="text-xs font-medium mb-0.5" style="color: var(--text-primary);">詢盤識別</div>
+                      <div class="text-xs" style="color: var(--text-muted);">「多少錢」→ 發送報價</div>
+                    </div>
+                    <div class="p-3 rounded-xl" style="background: var(--bg-card); border: 1px solid var(--border-default);">
+                      <div class="text-xs font-medium mb-0.5" style="color: var(--text-primary);">意向跟進</div>
+                      <div class="text-xs" style="color: var(--text-muted);">「有興趣」→ 私聊邀請</div>
+                    </div>
+                    <div class="p-3 rounded-xl" style="background: var(--bg-card); border: 1px solid var(--border-default);">
+                      <div class="text-xs font-medium mb-0.5" style="color: var(--text-primary);">異議處理</div>
+                      <div class="text-xs" style="color: var(--text-muted);">「太貴了」→ AI 話術</div>
+                    </div>
+                  </div>
                 </app-empty-state>
               </div>
             }
           </div>
         </div>
       </div>
+
+      } @else {
+      <!-- 🆕 P4-2: 觸發歷史視圖 -->
+      <div class="flex-1 overflow-y-auto space-y-4">
+
+        <!-- 今日規則活躍概覽 -->
+        <div class="grid grid-cols-3 gap-3">
+          <div class="bg-slate-800/50 rounded-xl border border-slate-700/50 p-4 text-center">
+            <div class="text-2xl font-bold text-purple-400">{{ sessionLog().length }}</div>
+            <div class="text-xs text-slate-500 mt-1">本次會話觸發</div>
+          </div>
+          <div class="bg-slate-800/50 rounded-xl border border-slate-700/50 p-4 text-center">
+            <div class="text-2xl font-bold text-emerald-400">{{ sessionSuccessCount() }}</div>
+            <div class="text-xs text-slate-500 mt-1">成功執行</div>
+          </div>
+          <div class="bg-slate-800/50 rounded-xl border border-slate-700/50 p-4 text-center">
+            <div class="text-2xl font-bold text-amber-400">{{ totalTriggerCount() }}</div>
+            <div class="text-xs text-slate-500 mt-1">累計觸發</div>
+          </div>
+        </div>
+
+        <!-- 本次會話事件流 -->
+        <div class="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden">
+          <div class="p-4 border-b border-slate-700/50 flex items-center justify-between">
+            <h3 class="font-semibold text-white flex items-center gap-2">
+              <span>⚡</span> 本次會話觸發記錄
+            </h3>
+            @if (sessionLog().length > 0) {
+              <button (click)="clearSessionLog()"
+                      class="text-xs text-slate-500 hover:text-red-400 transition-colors">
+                清除記錄
+              </button>
+            }
+          </div>
+          <div class="max-h-64 overflow-y-auto">
+            @if (sessionLog().length === 0) {
+              <div class="p-8 text-center">
+                <div class="text-4xl mb-3">📭</div>
+                <p class="text-slate-400 text-sm">本次會話尚無觸發記錄</p>
+                <p class="text-slate-500 text-xs mt-1">規則匹配關鍵詞後，記錄將實時顯示在此</p>
+              </div>
+            } @else {
+              <div class="divide-y divide-slate-700/50">
+                @for (event of sessionLog(); track event.id) {
+                  <div class="flex items-center gap-4 px-4 py-3 hover:bg-slate-700/20 transition-colors">
+                    <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 text-sm"
+                         [class.bg-emerald-500/20]="event.success"
+                         [class.bg-red-500/20]="!event.success">
+                      {{ event.success ? '✅' : '❌' }}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                      <div class="text-sm font-medium text-white truncate">{{ event.ruleName }}</div>
+                      <div class="text-xs text-slate-500 mt-0.5">
+                        <span class="text-slate-400">{{ event.keyword }}</span>
+                        <span class="mx-1.5">→</span>
+                        <span>{{ getActionLabel(event.responseType) }}</span>
+                      </div>
+                    </div>
+                    <div class="text-xs text-slate-500 flex-shrink-0">
+                      {{ formatEventTime(event.time) }}
+                    </div>
+                  </div>
+                }
+              </div>
+            }
+          </div>
+        </div>
+
+        <!-- 全局規則活躍度排行 -->
+        <div class="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden">
+          <div class="p-4 border-b border-slate-700/50">
+            <h3 class="font-semibold text-white flex items-center gap-2">
+              <span>🏆</span> 規則活躍度排行
+              <span class="text-xs text-slate-500 font-normal">(按觸發次數排序)</span>
+            </h3>
+          </div>
+          <div class="divide-y divide-slate-700/50">
+            @if (rules().length === 0) {
+              <div class="p-8 text-center">
+                <p class="text-slate-400 text-sm">尚未創建任何規則</p>
+              </div>
+            } @else {
+              @for (rule of sortedByTriggerCount(); track rule.id) {
+                <div class="flex items-center gap-4 px-4 py-3 hover:bg-slate-700/20 transition-colors">
+                  <div class="w-8 h-8 rounded-lg flex-shrink-0 flex items-center justify-center text-sm font-bold"
+                       [class.bg-amber-500/20]="rule.isActive"
+                       [class.bg-slate-700/50]="!rule.isActive"
+                       [class.text-amber-400]="rule.isActive"
+                       [class.text-slate-500]="!rule.isActive">
+                    {{ getResponseTypeIcon(rule.responseType) }}
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2">
+                      <span class="text-sm font-medium text-white truncate">{{ rule.name }}</span>
+                      @if (!rule.isActive) {
+                        <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-700 text-slate-500">已停用</span>
+                      }
+                    </div>
+                    <div class="flex items-center gap-3 mt-1">
+                      <!-- 命中率條形 -->
+                      <div class="flex-1 h-1.5 bg-slate-700/60 rounded-full overflow-hidden max-w-32">
+                        <div class="h-full rounded-full transition-all"
+                             [class.bg-emerald-400]="getRuleSuccessRate(rule) >= 70"
+                             [class.bg-amber-400]="getRuleSuccessRate(rule) >= 40 && getRuleSuccessRate(rule) < 70"
+                             [class.bg-red-400]="getRuleSuccessRate(rule) < 40"
+                             [style.width.%]="getRuleSuccessRate(rule)">
+                        </div>
+                      </div>
+                      <span class="text-xs text-slate-500">{{ getRuleSuccessRate(rule) }}% 命中率</span>
+                    </div>
+                  </div>
+                  <div class="text-right flex-shrink-0">
+                    <div class="text-sm font-bold text-white">{{ rule.triggerCount || 0 }}</div>
+                    <div class="text-[10px] text-slate-500">觸發次數</div>
+                  </div>
+                  @if (rule.lastTriggered) {
+                    <div class="text-xs text-slate-500 flex-shrink-0 w-20 text-right">
+                      {{ formatLastTriggered(rule.lastTriggered) }}
+                    </div>
+                  } @else {
+                    <div class="text-xs text-slate-600 flex-shrink-0 w-20 text-right">從未觸發</div>
+                  }
+                </div>
+              }
+            }
+          </div>
+        </div>
+
+      </div>
+      } <!-- end mainView @if/@else -->
+
     </div>
     
     <!-- 創建/編輯規則對話框 -->
@@ -822,12 +1202,179 @@ export class TriggerRulesComponent implements OnInit, OnDestroy {
     return Math.round(total / rules.length);
   });
   
+  // 🆕 Phase 2: 場景分類標籤
+  sceneFilter = signal<'all' | 'ai' | 'template' | 'record' | 'high'>('all');
+
+  readonly sceneTabs = [
+    { value: 'all' as const,      icon: '⚡', label: '全部',    activeColor: 'rgba(245,158,11,0.7)' },
+    { value: 'ai' as const,       icon: '🤖', label: 'AI 響應', activeColor: 'rgba(139,92,246,0.7)' },
+    { value: 'template' as const, icon: '📝', label: '模板發送', activeColor: 'rgba(6,182,212,0.7)'  },
+    { value: 'record' as const,   icon: '📊', label: '僅記錄',  activeColor: 'rgba(100,116,139,0.7)' },
+    { value: 'high' as const,     icon: '🔥', label: '高優先',  activeColor: 'rgba(239,68,68,0.7)'  },
+  ];
+
   filteredRules = computed(() => {
     const all = this.rules();
     if (this.filterStatus === 'active') return all.filter(r => r.isActive);
     if (this.filterStatus === 'inactive') return all.filter(r => !r.isActive);
     return all;
   });
+
+  scenedRules = computed(() => {
+    const base = this.filteredRules();
+    const scene = this.sceneFilter();
+    if (scene === 'all') return base;
+    if (scene === 'ai') return base.filter(r => r.responseType === 'ai_chat');
+    if (scene === 'template') return base.filter(r => r.responseType === 'template' || r.responseType === 'script');
+    if (scene === 'record') return base.filter(r => r.responseType === 'record_only');
+    if (scene === 'high') return base.filter(r => r.priority === 3);
+    return base;
+  });
+
+  // 🆕 Phase 3: 規則效果分析
+  showAnalysisPanel = signal(true);
+
+  // 🆕 P4-2: 觸發歷史視圖
+  mainView = signal<'rules' | 'history'>('rules');
+
+  sessionLog = signal<Array<{
+    id: string; time: Date; ruleName: string;
+    keyword: string; responseType: string; success: boolean;
+  }>>([]);
+
+  sortedByTriggerCount = computed(() =>
+    [...this.rules()].sort((a, b) => (b.triggerCount || 0) - (a.triggerCount || 0))
+  );
+
+  sessionSuccessCount = computed(() => this.sessionLog().filter(e => e.success).length);
+
+  /** 沉睡規則：啟用中但從未觸發，或最近 7 天未觸發 */
+  sleepingRules = computed(() => {
+    const now = Date.now();
+    const sevenDays = 7 * 24 * 60 * 60 * 1000;
+    return this.activeRules().filter(rule => {
+      if (!rule.triggerCount || rule.triggerCount === 0) return true;
+      if (rule.lastTriggered) {
+        const last = new Date(rule.lastTriggered).getTime();
+        return (now - last) > sevenDays;
+      }
+      return false;
+    });
+  });
+
+  /** 最佳表現規則（成功率最高且有觸發記錄） */
+  topPerformingRule = computed(() => {
+    const withData = this.rules().filter(r => (r.triggerCount || 0) > 0);
+    if (withData.length === 0) return null;
+    return withData.reduce((best, r) =>
+      this.getRuleSuccessRate(r) > this.getRuleSuccessRate(best) ? r : best
+    );
+  });
+
+  /** 規則引擎健康分 (0-100) */
+  engineHealthScore = computed(() => {
+    const all = this.rules();
+    if (all.length === 0) return 0;
+    const active = this.activeRules();
+    if (active.length === 0) return 10;
+
+    // 因素1：活躍比例 (30分)
+    const activeRatio = active.length / all.length;
+    const score1 = activeRatio * 30;
+
+    // 因素2：平均命中率 (40分)
+    const score2 = (this.averageSuccessRate() / 100) * 40;
+
+    // 因素3：沉睡規則懲罰 (30分)
+    const sleepRatio = this.sleepingRules().length / Math.max(active.length, 1);
+    const score3 = (1 - sleepRatio) * 30;
+
+    return Math.round(score1 + score2 + score3);
+  });
+
+  /** 自動優化建議 */
+  ruleOptimizationTips = computed(() => {
+    const tips: string[] = [];
+    const sleeping = this.sleepingRules();
+    const avgRate = this.averageSuccessRate();
+    const total = this.totalTriggerCount();
+
+    if (sleeping.length > 0) {
+      tips.push(`${sleeping.length} 條規則長期未觸發，建議檢查關鍵詞集或監控群組配置`);
+    }
+    if (avgRate < 50 && total > 10) {
+      tips.push('整體命中率低於 50%，建議優化響應類型或精簡關鍵詞');
+    }
+    if (this.activeRules().length === 0 && this.rules().length > 0) {
+      tips.push('所有規則已停用，AI 將使用默認回覆，建議啟用至少一條規則');
+    }
+    if (this.rules().filter(r => r.responseType === 'record_only').length === this.rules().length) {
+      tips.push('所有規則僅記錄不回覆，建議添加 AI 響應或模板回覆規則');
+    }
+    return tips;
+  });
+
+  // 🆕 P4-2: History view helpers
+  clearSessionLog() {
+    this.sessionLog.set([]);
+  }
+
+  getActionLabel(responseType: string): string {
+    const map: Record<string, string> = {
+      'ai_chat': '🤖 AI 回覆',
+      'template': '📄 模板發送',
+      'script': '📝 腳本執行',
+      'record_only': '📋 僅記錄'
+    };
+    return map[responseType] || responseType;
+  }
+
+  getResponseTypeIcon(responseType: string): string {
+    const map: Record<string, string> = {
+      'ai_chat': '🤖',
+      'template': '📄',
+      'script': '📝',
+      'record_only': '📋'
+    };
+    return map[responseType] || '⚡';
+  }
+
+  formatEventTime(time: Date): string {
+    return time.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  }
+
+  formatLastTriggered(dateStr: string): string {
+    const d = new Date(dateStr);
+    const now = new Date();
+    const diff = now.getTime() - d.getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 60) return `${mins}分鐘前`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}小時前`;
+    return `${Math.floor(hrs / 24)}天前`;
+  }
+
+  getRuleCountForScene(scene: string): number {
+    const base = this.filteredRules();
+    if (scene === 'all') return base.length;
+    if (scene === 'ai') return base.filter(r => r.responseType === 'ai_chat').length;
+    if (scene === 'template') return base.filter(r => r.responseType === 'template' || r.responseType === 'script').length;
+    if (scene === 'record') return base.filter(r => r.responseType === 'record_only').length;
+    if (scene === 'high') return base.filter(r => r.priority === 3).length;
+    return 0;
+  }
+
+  getRuleSuccessRate(rule: TriggerRule): number {
+    if (!rule.triggerCount || rule.triggerCount === 0) return 0;
+    return Math.round((rule.successCount || 0) / rule.triggerCount * 100);
+  }
+
+  getRuleHealthClass(rule: TriggerRule): string {
+    const rate = this.getRuleSuccessRate(rule);
+    if (rate >= 70) return 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20';
+    if (rate >= 30) return 'bg-amber-500/15 text-amber-400 border border-amber-500/20';
+    return 'bg-red-500/15 text-red-400 border border-red-500/20';
+  }
   
   private listeners: (() => void)[] = [];
   // 🔧 FIX: 添加重試計數
@@ -901,6 +1448,21 @@ export class TriggerRulesComponent implements OnInit, OnDestroy {
 
     
     
+    // 🆕 P4-2: 實時觸發事件監聽（累積本次會話記錄）
+    const cleanupTrigger = this.ipcService.on('rule-triggered', (data: any) => {
+      if (data?.ruleName || data?.rule_name) {
+        this.sessionLog.update(prev => [{
+          id: `evt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          time: new Date(),
+          ruleName: data.ruleName || data.rule_name || '未知規則',
+          keyword: data.keyword || data.matched_keyword || '',
+          responseType: data.responseType || data.response_type || 'record_only',
+          success: data.success !== false
+        }, ...prev].slice(0, 50));
+      }
+    });
+    this.listeners.push(cleanupTrigger);
+
     // AI 設置監聽
     const cleanup5 = this.ipcService.on('ai-settings-loaded', (data: any) => {
       if (data) {

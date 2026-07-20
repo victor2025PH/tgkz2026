@@ -687,7 +687,7 @@ export class BatchSendDialogComponent implements OnInit, OnDestroy {
     'invalid_id': '⚠️ 無效 ID',
     'no_account': '📱 無可用帳號',
     'cancelled': '⏹️ 已取消',
-    'other': '❌ 其他錯誤'
+    'other': '❌ 其他錯誤',
   };
   
   // 預覽

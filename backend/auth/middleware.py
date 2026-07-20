@@ -131,36 +131,36 @@ async def authenticate_request(request) -> AuthContext:
     ctx = AuthContext()
     path = request.path
     
-    # 🔍 調試日誌
+    # 🔍 調試日誌（debug 級別，避免 login-token 輪詢刷屏）
     auth_header = request.headers.get('Authorization', '')
-    logger.info(f"[AuthDebug] {path} - Auth header present: {bool(auth_header)}, value: {auth_header[:50] if auth_header else 'NONE'}...")
+    logger.debug(f"[AuthDebug] {path} - Auth header present: {bool(auth_header)}, value: {auth_header[:50] if auth_header else 'NONE'}...")
     
     # 1. 嘗試 Bearer Token 認證
     token = extract_token(request)
-    logger.info(f"[AuthDebug] {path} - Token extracted: {bool(token)}")
+    logger.debug(f"[AuthDebug] {path} - Token extracted: {bool(token)}")
     
     if token:
         payload = verify_token(token)
-        logger.info(f"[AuthDebug] {path} - Token verified: {bool(payload)}, payload: {payload}")
+        logger.debug(f"[AuthDebug] {path} - Token verified: {bool(payload)}, payload: {payload}")
         
         if payload:
             auth_service = get_auth_service()
             user = await auth_service.get_user(payload.get('sub'))
-            logger.info(f"[AuthDebug] {path} - User found: {bool(user)}, active: {user.is_active if user else 'N/A'}")
+            logger.debug(f"[AuthDebug] {path} - User found: {bool(user)}, active: {user.is_active if user else 'N/A'}")
             
             if user and user.is_active:
                 ctx.user = user
                 ctx.token = token
                 ctx.is_authenticated = True
                 ctx.auth_method = 'token'
-                logger.info(f"[AuthDebug] {path} - ✅ Authentication successful for user: {user.id}")
+                logger.debug(f"[AuthDebug] {path} - ✅ Authentication successful for user: {user.id}")
                 return ctx
             else:
                 logger.warning(f"[AuthDebug] {path} - ❌ User not found or inactive")
         else:
             logger.warning(f"[AuthDebug] {path} - ❌ Token verification failed")
     else:
-        logger.info(f"[AuthDebug] {path} - No token provided")
+        logger.debug(f"[AuthDebug] {path} - No token provided")
     
     # 2. 嘗試 API Key 認證
     api_key = extract_api_key(request)

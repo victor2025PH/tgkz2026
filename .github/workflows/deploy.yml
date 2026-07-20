@@ -155,10 +155,31 @@ jobs:
             sleep 10
           done
       
+      - name: Ensure INTERNAL_API_URL on server (掃碼登錄 Bot 與 API 同源)
+        run: |
+          ssh -o ConnectTimeout=30 -o ServerAliveInterval=15 deploy-server << 'ENDSSH'
+            cd /opt/tg-matrix
+            ENV_FILE=".env"
+            URL="https://tgw.usdt2026.cc"
+            if [ -f "$ENV_FILE" ]; then
+              if grep -q '^INTERNAL_API_URL=' "$ENV_FILE" 2>/dev/null; then
+                sed -i.bak "s|^INTERNAL_API_URL=.*|INTERNAL_API_URL=$URL|" "$ENV_FILE"
+                echo "Updated INTERNAL_API_URL=$URL in $ENV_FILE"
+              else
+                echo "INTERNAL_API_URL=$URL" >> "$ENV_FILE"
+                echo "Appended INTERNAL_API_URL=$URL to $ENV_FILE"
+              fi
+            else
+              echo "INTERNAL_API_URL=$URL" > "$ENV_FILE"
+              echo "Created $ENV_FILE with INTERNAL_API_URL=$URL"
+            fi
+          ENDSSH
+      
       - name: Restart services
         run: |
           ssh -o ConnectTimeout=30 -o ServerAliveInterval=15 deploy-server << 'ENDSSH'
             cd /opt/tg-matrix
+            export INTERNAL_API_URL="https://tgw.usdt2026.cc"
             
             # 🔧 清理孤儿容器防止名称冲突（无容器时 docker rm 可能返回 1，忽略）
             sudo docker compose down --remove-orphans 2>/dev/null || true
@@ -167,9 +188,9 @@ jobs:
             # 重新創建 nginx 容器（確保新的 volume 掛載生效）
             sudo docker compose up -d web
             
-            # 重建並重啟 API 服務（後端代碼更新時需要）
+            # 重建並重啟 API（--force-recreate 確保讀取最新 .env；Bot 須有 INTERNAL_API_URL 才能掃碼成功）
             sudo docker compose build --no-cache api
-            sudo docker compose up -d api
+            sudo -E docker compose up -d --force-recreate api
             
             # 等待服務啟動
             sleep 15

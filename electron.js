@@ -2,6 +2,8 @@
 const { app, BrowserWindow, ipcMain, dialog, shell, protocol } = require('electron');
 const path = require('path');
 const fs = require('fs');
+// 🆕 載入 .env（TELEGRAM_BOT_USERNAME / TELEGRAM_BOT_TOKEN 等），供後端進程繼承
+try { require('dotenv').config({ path: path.join(__dirname, '.env') }); } catch (_) {}
 const { spawn } = require('child_process');
 const { v4: uuidv4 } = require('uuid');
 const AutoAiSetup = require('./auto-ai-setup');
@@ -461,24 +463,9 @@ function createWindow() {
   mainWindow.once('ready-to-show', () => {
     writeLog('Main window ready to show, waiting for backend...');
     
-    // 檢查後端是否已準備好
-    const checkAndShow = () => {
-      if (backendReadyForUI) {
-        writeLog('Backend ready, showing main window');
-        if (splashWindow && !splashWindow.isDestroyed()) {
-          splashWindow.close();
-          splashWindow = null;
-        }
-        mainWindow.show();
-        writeLog('Main window shown');
-      } else {
-        // 每 500ms 檢查一次
-        setTimeout(checkAndShow, 500);
-      }
-    };
-    
     // 設置最大等待時間 60 秒
-    const maxWaitTimeout = setTimeout(() => {
+    let maxWaitTimeout = setTimeout(() => {
+      maxWaitTimeout = null;
       writeLog('Max wait time reached (60s), showing main window anyway', 'WARN');
       if (!mainWindow.isVisible()) {
         if (splashWindow && !splashWindow.isDestroyed()) {
@@ -486,15 +473,34 @@ function createWindow() {
           splashWindow = null;
         }
         mainWindow.show();
+        if (mainWindow.webContents && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('backend-status', { running: false, error: '後端未在時限內就緒', suggestion: '請檢查終端日誌或重啟應用' });
+        }
       }
     }, 60000);
     
-    // 開始檢查
+    // 檢查後端是否已準備好，就緒時清除 60s 超時並顯示窗口
+    const checkAndShow = () => {
+      if (backendReadyForUI) {
+        if (maxWaitTimeout) { clearTimeout(maxWaitTimeout); maxWaitTimeout = null; }
+        writeLog('Backend ready, showing main window');
+        if (splashWindow && !splashWindow.isDestroyed()) {
+          splashWindow.close();
+          splashWindow = null;
+        }
+        mainWindow.show();
+        writeLog('Main window shown');
+        if (mainWindow.webContents && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('backend-status', { running: true, error: null });
+        }
+      } else {
+        setTimeout(checkAndShow, 500);
+      }
+    };
     checkAndShow();
     
-    // 當窗口顯示後清除超時
     mainWindow.once('show', () => {
-      clearTimeout(maxWaitTimeout);
+      if (maxWaitTimeout) { clearTimeout(maxWaitTimeout); maxWaitTimeout = null; }
     });
   });
 
@@ -506,14 +512,15 @@ function createWindow() {
     // 開發模式：清除緩存並連接到 Angular 開發服務器
     console.log('[Electron] 🚀 開發模式：連接到 http://localhost:4200');
     
-    // 清除緩存以確保加載最新代碼
+    // 清除緩存以確保加載最新代碼，避免舊 chunk 導致白屏
     mainWindow.webContents.session.clearCache().then(() => {
       console.log('[Electron] ✅ 緩存已清除');
     }).catch(err => {
       console.log('[Electron] 清除緩存時出錯:', err);
     });
     
-    mainWindow.loadURL('http://localhost:4200');
+    const devUrl = 'http://localhost:4200/?t=' + Date.now();
+    mainWindow.loadURL(devUrl);
     
     // 監聽開發服務器是否就緒
     let retryCount = 0;
@@ -570,9 +577,20 @@ function createWindow() {
     }
   }
 
-  // 確保開發模式下打開 DevTools，並監聽錯誤
+  // 開發模式：chunk 404 時清除緩存並重載一次（解決 ng 重編譯後舊 chunk 名失效導致白屏）
+  let chunkFailReloadDone = false;
   mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
     console.error('[Electron] 頁面載入失敗:', errorCode, errorDescription, validatedURL);
+    const isDev = process.argv.includes('--dev');
+    const isChunk = /chunk-[A-Z0-9]+\.js$/i.test(validatedURL || '');
+    const isAbortedOrNet = errorCode === -2 || errorCode === -3; // ERR_ABORTED / ERR_CONNECTION_REFUSED
+    if (isDev && isChunk && isAbortedOrNet && !chunkFailReloadDone) {
+      chunkFailReloadDone = true;
+      mainWindow.webContents.session.clearCache().then(() => {
+        console.log('[Electron] Chunk 404：已清除緩存，正在重載...');
+        mainWindow.webContents.reload();
+      });
+    }
   });
 
   mainWindow.webContents.on('console-message', (event, level, message) => {
@@ -601,8 +619,10 @@ function createWindow() {
     writeLog(`[Electron] Page did-fail-load: ${errorCode} - ${errorDescription} - ${validatedURL}`);
   });
   
-  // Start the Python backend
-  startPythonBackend();
+  // 僅在尚未啟動時啟動後端（app.ready 已先等 8000 再調用 createWindow，通常已啟動）
+  if (!pythonProcess) {
+    startPythonBackend();
+  }
 
   mainWindow.on('closed', () => {
     mainWindow = null;
@@ -747,8 +767,15 @@ app.on('ready', async () => {
     writeLog('AI auto setup failed: ' + error.message, 'ERROR');
   }
   
-  updateSplashStatus('正在啟動後端服務...', 60);
-  
+  // 🆕 先啟動後端並等 8000 就緒，再打開主窗口（避免登入頁請求早於後端）
+  updateSplashStatus('正在啟動後端 (8000)...', 60);
+  try {
+    await startBackendAndWaitFor8000();
+    updateSplashStatus('後端已就緒，正在打開主界面...', 95);
+  } catch (err) {
+    writeLog('Backend wait failed: ' + (err && err.message), 'ERROR');
+    updateSplashStatus(null, null, err && err.message ? err.message : '後端啟動超時');
+  }
   createWindow();
 });
 
@@ -1077,6 +1104,7 @@ function startPythonBackend() {
     
     // 🆕 P1: 後端健康檢查
     let backendReady = false;
+    let healthCheckInterval = null;
     const healthCheckTimeout = setTimeout(() => {
         if (!backendReadyForUI && pythonProcess && !pythonProcess.killed) {
             writeLog('Backend health check: no full init in 60s', 'WARN');
@@ -1087,7 +1115,42 @@ function startPythonBackend() {
                 updateSplashStatus(null, null, '後端服務無響應，請檢查安裝');
             }
         }
+        if (healthCheckInterval) {
+            clearInterval(healthCheckInterval);
+            healthCheckInterval = null;
+        }
     }, 60000);
+    
+    // 🆕 P1: HTTP 健康檢查後備（stdout 訊息可能被 chunk 截斷時，仍能根據 8000 就緒顯示視窗）
+    const BASE_HTTP = 'http://127.0.0.1:8000';
+    healthCheckInterval = setInterval(() => {
+        if (backendReadyForUI || !pythonProcess || pythonProcess.killed) {
+            if (healthCheckInterval) {
+                clearInterval(healthCheckInterval);
+                healthCheckInterval = null;
+            }
+            return;
+        }
+        const http = require('http');
+        const req = http.get(BASE_HTTP + '/health', { timeout: 3000 }, (res) => {
+            if (res.statusCode === 200 && !backendReadyForUI) {
+                backendReadyForUI = true;
+                clearTimeout(healthCheckTimeout);
+                if (healthCheckInterval) {
+                    clearInterval(healthCheckInterval);
+                    healthCheckInterval = null;
+                }
+                writeLog('Backend ready (HTTP health check)');
+                updateSplashStatus('後端服務已就緒，正在載入界面...', 95);
+                if (onBackendReadyCallback) { onBackendReadyCallback(); onBackendReadyCallback = null; }
+                if (mainWindow && !mainWindow.isDestroyed()) {
+                    mainWindow.webContents.send('backend-status', { running: true, error: null });
+                }
+            }
+        });
+        req.on('error', () => {});
+        req.on('timeout', () => { req.destroy(); });
+    }, 2000);
     
     // Handle stdout (events from Python)
     pythonProcess.stdout.on('data', (data) => {
@@ -1102,17 +1165,20 @@ function startPythonBackend() {
             writeLog('First data preview: ' + rawData.substring(0, 100));
         }
         
-        // 🆕 P1: 當收到初始化完成的標誌時，才標記為 UI 可用
-        // 🔧 修復：舊條件含 rawData.includes('"event"')——後端第一條輸出
-        // {"event":"backend-starting"}（初始化「開始」信號）就會誤判為就緒，
-        // 比真實就緒早數十秒。現只認顯式 backend-ready 事件與完成文案。
-        if (!backendReadyForUI && (rawData.includes('"backend-ready"') || rawData.includes('後端初始化完成') || rawData.includes('Initialization complete'))) {
+        // 🆕 P1: 僅在 HTTP 就緒後發送的標誌時才標記 UI 可用（勿用 "event"：backend-starting 在啟動首行即輸出，會導致視窗早於 8000 就緒顯示）
+        // 同時保留顯式 backend-ready 事件作為就緒信號（兩側修復合併）
+        const fullBuffer = stdoutBuffer;
+        if (!backendReadyForUI && (rawData.includes('"backend-ready"') || fullBuffer.includes('後端初始化完成') || fullBuffer.includes('Initialization complete'))) {
             backendReadyForUI = true;
             backendRestartCount = 0;  // 成功就緒後重置重啟計數
             clearTimeout(healthCheckTimeout);
+            if (healthCheckInterval) {
+                clearInterval(healthCheckInterval);
+                healthCheckInterval = null;
+            }
             writeLog('Backend fully initialized, ready for UI');
             updateSplashStatus('後端服務已就緒，正在載入界面...', 95);
-            
+            if (onBackendReadyCallback) { onBackendReadyCallback(); onBackendReadyCallback = null; }
             // 通知前端後端已就緒
             if (mainWindow && !mainWindow.isDestroyed()) {
                 mainWindow.webContents.send('backend-status', {
@@ -1155,6 +1221,18 @@ function startPythonBackend() {
                     const { request_id, status, error } = event.payload;
                     requestManager.handleCompletion(request_id, status, error);
                     // Don't forward completion events to frontend (already handled)
+                    return;
+                }
+                
+                // 🆕 安裝版會員登入：command-response 用於 invoke 類命令的返回值
+                if (event.event === 'command-response') {
+                    const { request_id, result } = event.payload || {};
+                    const pending = global.pendingCommandResolvers && request_id && global.pendingCommandResolvers.get(request_id);
+                    if (pending) {
+                        if (pending.timer) clearTimeout(pending.timer);
+                        global.pendingCommandResolvers.delete(request_id);
+                        pending.resolve(result);
+                    }
                     return;
                 }
                 
@@ -1290,6 +1368,27 @@ function startPythonBackend() {
     });
 }
 
+/**
+ * 🆕 先啟動後端並等待 8000 就緒，再 resolve。用於 app.ready 中先打開 8000、再 createWindow。
+ * @returns {Promise<void>} 後端 /health 就緒或超時後 resolve/reject
+ */
+function startBackendAndWaitFor8000() {
+    return new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+            if (onBackendReadyCallback) {
+                onBackendReadyCallback = null;
+                reject(new Error('後端未在 60 秒內就緒 (8000)'));
+            }
+        }, 60000);
+        onBackendReadyCallback = () => {
+            clearTimeout(timeout);
+            onBackendReadyCallback = null;
+            resolve();
+        };
+        startPythonBackend();
+    });
+}
+
 // 檢查 Python 環境
 function checkPythonEnvironment() {
     return new Promise((resolve) => {
@@ -1372,6 +1471,29 @@ function sendToPython(command, payload = {}, requestId = null) {
 ipcMain.on('get-initial-state', (event) => {
   console.log('[IPC] Received: get-initial-state');
   sendToPython('get-initial-state');
+});
+
+// 🆕 桌面版 invoke 用：無後端對應時返回默認值，避免 "No handler registered" 報錯
+ipcMain.handle('alerts:get', async () => ({ success: true, data: { active: [], recent: [], summary: {} } }));
+ipcMain.handle('events:get-history', async () => []);
+
+// 🆕 安裝版會員登入：invoke 模式，等待後端 command-response 後返回
+ipcMain.handle('auth-login', async (event, payload = {}) => {
+  if (!pythonProcess || pythonProcess.killed) {
+    return { success: false, error: '後端未就緒，請稍後重試' };
+  }
+  const requestId = requestManager.generateRequestId();
+  global.pendingCommandResolvers = global.pendingCommandResolvers || new Map();
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      if (global.pendingCommandResolvers && global.pendingCommandResolvers.has(requestId)) {
+        global.pendingCommandResolvers.delete(requestId);
+        resolve({ success: false, error: '登入請求超時，請重試' });
+      }
+    }, 15000);
+    global.pendingCommandResolvers.set(requestId, { resolve, reject, timer });
+    sendToPython('auth-login', payload, requestId);
+  });
 });
 
 // Generic handler for most commands that just pass through to Python

@@ -784,6 +784,7 @@
     "openTelegramApp": "打开 Telegram App 登录",
     "clickConfirmInTelegram": "请在 Telegram 中点击「确认登录」按钮",
     "remainingTime": "剩余时间: {{seconds}}s",
+    "orEnterCode": "或输入验证码",
     "cancel": "取消",
     "useTelegramWidget": "使用 Telegram Widget 登录",
     "widgetHint": "适用于已在浏览器登录 Telegram 的用户"
@@ -849,12 +850,24 @@
     "displayName": "显示名称",
     "avatarUrl": "头像 URL",
     "updateProfile": "更新资料",
+    "saveProfileError": "保存失败，请重试",
     "revokeSession": "撤销",
     "revokeAllSessions": "撤销所有其他设备",
     "createApiKey": "创建 API 密钥",
     "deleteApiKey": "删除",
     "lastUsed": "最后使用",
-    "neverUsed": "从未使用"
+    "neverUsed": "从未使用",
+    "logoutSectionTitle": "账号退出",
+    "logoutSectionDesc": "退出后将返回登录页，您需要重新登录才能继续使用。此操作仅登出当前设备。",
+    "logoutConfirmText": "确定要退出登录吗？您需要重新登录才能再次使用。",
+    "logoutConfirmButton": "确定退出",
+    "loadingApiKeys": "載入中...",
+    "apiKeyCreatedOnce": "密鑰已創建，請妥善保存。此密鑰僅顯示一次。",
+    "apiKeyNamePrompt": "請輸入密鑰名稱（用於識別）",
+    "apiKeyNamePlaceholder": "Unnamed Key",
+    "copyKey": "複製",
+    "deleteApiKeyConfirm": "確定要刪除此 API 密鑰嗎？刪除後無法恢復。",
+    "logoutUnsavedHint": "您有未保存的個人資料修改，是否仍要退出？"
   },
   "notification": {
     "center": "通知中心",

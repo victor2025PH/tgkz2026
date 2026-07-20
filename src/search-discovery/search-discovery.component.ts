@@ -75,9 +75,9 @@ export interface Account {
   standalone: true,
   imports: [CommonModule, FormsModule, EmptyStateComponent],
   template: `
-    <div class="h-full flex flex-col bg-slate-900 text-white overflow-hidden">
+    <div class="sd-page h-full flex flex-col overflow-hidden">
       <!-- 頂部：標題 + 帳號（精簡） -->
-      <div class="flex-shrink-0 px-6 pt-4 pb-2 border-b border-slate-700/50 bg-slate-900/95 backdrop-blur-sm">
+      <div class="sd-chrome flex-shrink-0 px-6 pt-4 pb-2 border-b backdrop-blur-sm">
         <div class="flex items-center justify-between mb-4">
           <h1 class="text-2xl font-bold text-white flex items-center gap-3">
             <span class="flex items-center justify-center w-10 h-10 rounded-xl"
@@ -280,7 +280,7 @@ export interface Account {
           <div class="px-6 py-3">
             <div class="flex items-center justify-between mb-2">
               <div class="flex items-center gap-3 text-sm">
-                <span class="text-purple-400 font-medium">📋 今日操作記錄</span>
+                <span class="font-medium" style="color: var(--accent-light);">今日操作記錄</span>
                 <span class="px-2 py-0.5 bg-green-500/20 text-green-400 rounded text-xs">
                   ✅ {{ opHistory.statsByType().join.success + opHistory.statsByType().monitor.success + opHistory.statsByType().extract.success }}
                 </span>
@@ -316,7 +316,7 @@ export interface Account {
 
       <!-- 搜索欄區域（僅搜索發現頁顯示；資源中心首屏以列表為主） -->
       @if (initialView() !== 'resource-center') {
-      <div class="flex-shrink-0 px-6 py-4 border-b border-slate-700/30 bg-slate-800/30">
+      <div class="sd-chrome flex-shrink-0 px-6 py-4 border-b">
         <!-- 搜索輸入 -->
         <div class="flex gap-3 mb-4">
           <div class="flex-1 relative">
@@ -327,8 +327,8 @@ export interface Account {
                    (focus)="onSearchInputChange(searchQuery); showSuggestions.set(true)"
                    (blur)="hideSuggestions()"
                    placeholder="輸入關鍵詞搜索群組和頻道..."
-                   class="w-full bg-slate-700/50 border border-slate-600 rounded-xl py-3 px-4 pl-12 text-white text-lg focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 transition-all">
-            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+                   class="sd-input w-full rounded-xl py-3 px-4 pl-12 text-lg transition-all">
+            <span class="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" style="color: var(--text-muted);">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
             </span>
             
@@ -388,9 +388,9 @@ export interface Account {
               </div>
             }
           </div>
-          <button (click)="doSearch()" 
+          <button (click)="doSearch()"
                   [disabled]="mergedSearching() || !searchQuery.trim()"
-                  class="px-8 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white rounded-xl font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-cyan-500/25">
+                  class="sd-btn sd-btn-join px-8 py-3 rounded-xl font-medium disabled:opacity-50 disabled:cursor-not-allowed">
             {{ mergedSearching() ? '搜索中...' : '搜索' }}
           </button>
         </div>
@@ -435,28 +435,27 @@ export interface Account {
       
       <!-- 結果統計和操作欄 -->
       @if (mergedResources().length > 0 || currentKeyword()) {
-        <div class="flex-shrink-0 px-6 py-3 border-b border-slate-700/30 bg-slate-800/20">
+        <div class="sd-toolbar flex-shrink-0 px-6 py-3 border-b">
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-4">
               @if (currentKeyword()) {
                 <div class="flex items-center gap-2">
-                  <span class="text-slate-400 text-sm">當前搜索：</span>
-                  <span class="px-3 py-1 bg-cyan-500/20 text-cyan-400 rounded-full text-sm font-medium">
-                    🔍 {{ currentKeyword() }}
+                  <span class="text-sm" style="color: var(--text-muted);">當前搜索：</span>
+                  <span class="px-3 py-1 rounded-full text-sm font-medium"
+                        style="background: var(--primary-bg); color: var(--primary-light);">
+                    {{ currentKeyword() }}
                   </span>
                 </div>
               }
-              <span class="text-slate-400 text-sm flex items-center gap-3">
-                共 <span class="font-bold text-white">{{ mergedResources().length }}</span> 個結果
-                <!-- 🆕 顯示新發現/已知統計 -->
+              <span class="text-sm flex items-center gap-3" style="color: var(--text-muted);">
+                共 <span class="font-bold" style="color: var(--text-primary);">{{ mergedResources().length }}</span> 個結果
                 @if (isFromCache()) {
-                  <span class="px-2 py-0.5 bg-amber-500/20 text-amber-400 rounded text-xs">
-                    📋 緩存
-                  </span>
+                  <span class="px-2 py-0.5 rounded text-xs"
+                        style="background: var(--warning-bg); color: var(--warning);">緩存</span>
                 }
                 @if (newDiscoveredCount() > 0 || existingCount() > 0) {
-                  <span class="text-green-400 text-xs">🆕 {{ newDiscoveredCount() }} 個新發現</span>
-                  <span class="text-slate-500 text-xs">🔄 {{ existingCount() }} 個已知</span>
+                  <span class="text-xs" style="color: var(--success);">{{ newDiscoveredCount() }} 個新發現</span>
+                  <span class="text-xs" style="color: var(--text-disabled);">{{ existingCount() }} 個已知</span>
                 }
               </span>
               <!-- 🔧 渠道級搜索進度 -->
@@ -492,47 +491,35 @@ export interface Account {
             </div>
             
             <div class="flex items-center gap-2">
-              <select [(ngModel)]="filterType"
-                      class="bg-slate-700/50 border border-slate-600 rounded-lg py-1.5 px-3 text-white text-sm">
+              <select [(ngModel)]="filterType" class="sd-select py-1.5 px-3 text-sm">
                 <option value="all">全部類型</option>
                 <option value="group">群組</option>
                 <option value="channel">頻道</option>
               </select>
-              <!-- 🆕 高級篩選按鈕 -->
               <button (click)="showAdvancedFilter.set(!showAdvancedFilter())"
-                      class="px-3 py-1.5 rounded-lg text-sm flex items-center gap-1 transition-all"
-                      [class]="showAdvancedFilter() || activeFilterCount() > 0 
-                        ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/50' 
-                        : 'bg-slate-700/50 text-slate-300 border border-slate-700 hover:border-slate-600'">
-                🎛️ 高級篩選
+                      class="sd-btn text-sm"
+                      [class.sd-btn-join]="showAdvancedFilter() || activeFilterCount() > 0"
+                      [class.sd-btn-ghost]="!(showAdvancedFilter() || activeFilterCount() > 0)"
+                      style="padding: 0.375rem 0.75rem;">
+                高級篩選
                 @if (activeFilterCount() > 0) {
-                  <span class="ml-1 px-1.5 py-0.5 bg-cyan-500 text-white text-xs rounded-full">
-                    {{ activeFilterCount() }}
-                  </span>
+                  <span class="ml-1 px-1.5 py-0.5 text-xs rounded-full" style="background: rgba(255,255,255,0.2);">{{ activeFilterCount() }}</span>
                 }
               </button>
-              <button (click)="batchSave()" 
-                      class="px-3 py-1.5 bg-yellow-500/20 text-yellow-400 rounded-lg hover:bg-yellow-500/30 text-sm flex items-center gap-1">
-                ⭐ 批量收藏
-              </button>
-              <!-- 🔧 Phase3: 導出格式選擇 -->
+              <button (click)="batchSave()" class="sd-btn sd-btn-warn text-sm" style="padding: 0.375rem 0.75rem;">批量收藏</button>
               <div class="relative">
-                <button (click)="toggleExportMenu($event)" 
+                <button (click)="toggleExportMenu($event)"
                         [disabled]="filteredResources().length === 0"
-                        class="px-3 py-1.5 rounded-lg text-sm flex items-center gap-1 transition-all"
-                        [class]="filteredResources().length > 0 ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30' : 'bg-slate-600/30 text-slate-500 cursor-not-allowed'">
-                  📤 導出 ({{ filteredResources().length }}) ▾
+                        class="sd-btn sd-btn-monitor text-sm" style="padding: 0.375rem 0.75rem;">
+                  導出 ({{ filteredResources().length }}) ▾
                 </button>
                 @if (showExportMenu()) {
-                  <div class="absolute top-full right-0 mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-30 overflow-hidden min-w-32">
+                  <div class="absolute top-full right-0 mt-1 rounded-lg shadow-xl z-30 overflow-hidden min-w-32"
+                       style="background: var(--bg-card); border: 1px solid var(--border-default);">
                     <button (click)="exportResults('csv'); showExportMenu.set(false)"
-                            class="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-cyan-500/10 hover:text-cyan-400 transition-all">
-                      📄 CSV 格式
-                    </button>
+                            class="w-full text-left px-4 py-2 text-sm" style="color: var(--text-secondary);">CSV 格式</button>
                     <button (click)="exportResults('json'); showExportMenu.set(false)"
-                            class="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-cyan-500/10 hover:text-cyan-400 transition-all">
-                      📋 JSON 格式
-                    </button>
+                            class="w-full text-left px-4 py-2 text-sm" style="color: var(--text-secondary);">JSON 格式</button>
                   </div>
                 }
               </div>
@@ -613,52 +600,26 @@ export interface Account {
             </div>
           }
           
-          <!-- 🆕 批量選擇面板 -->
+          <!-- 批量選擇面板 -->
           @if (filteredResources().length > 0) {
-            <div class="mt-3 pt-3 border-t border-slate-700/30 flex items-center justify-between">
+            <div class="mt-3 pt-3 flex items-center justify-between" style="border-top: 1px solid var(--border-default);">
               <div class="flex items-center gap-3">
-                <span class="text-slate-400 text-sm">批量操作:</span>
-                <button (click)="selectAllVisible()" 
-                        class="px-2 py-1 text-xs bg-slate-700/50 hover:bg-slate-700 text-slate-300 rounded transition-all">
-                  ☑️ 全選本頁
-                </button>
-                <button (click)="clearSelection()" 
-                        class="px-2 py-1 text-xs bg-slate-700/50 hover:bg-slate-700 text-slate-300 rounded transition-all">
-                  ☐ 取消全選
-                </button>
-                <button (click)="invertSelection()" 
-                        class="px-2 py-1 text-xs bg-slate-700/50 hover:bg-slate-700 text-slate-300 rounded transition-all">
-                  ⇆ 反選
-                </button>
+                <span class="text-sm" style="color: var(--text-muted);">批量操作:</span>
+                <button (click)="selectAllVisible()" class="sd-btn sd-btn-ghost text-xs" style="padding: 0.25rem 0.5rem;">全選本頁</button>
+                <button (click)="clearSelection()" class="sd-btn sd-btn-ghost text-xs" style="padding: 0.25rem 0.5rem;">取消全選</button>
+                <button (click)="invertSelection()" class="sd-btn sd-btn-ghost text-xs" style="padding: 0.25rem 0.5rem;">反選</button>
               </div>
-              
               @if (selectedCount() > 0) {
-                <div class="flex items-center gap-3 px-3 py-1.5 bg-cyan-500/10 rounded-lg border border-cyan-500/30">
-                  <span class="text-cyan-400 text-sm font-medium">
-                    ✓ 已選 {{ selectedCount() }} 項
-                  </span>
-                  <div class="w-px h-4 bg-slate-600"></div>
-                  <button (click)="batchSaveSelected()" 
-                          class="px-2 py-1 text-xs bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400 rounded transition-all">
-                    ⭐ 收藏選中
-                  </button>
-                  <button (click)="copySelectedIds()" 
-                          class="px-2 py-1 text-xs bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-400 rounded transition-all">
-                    📋 複製ID
-                  </button>
-                  <button (click)="batchExtractSelected()" 
-                          class="px-2 py-1 text-xs bg-green-500/20 hover:bg-green-500/30 text-green-400 rounded transition-all">
-                    👥 批量提取成員
-                  </button>
-                  <button (click)="batchAddToMonitoring()" 
-                          class="px-2 py-1 text-xs bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 rounded transition-all">
-                    📡 批量監控
-                  </button>
+                <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg"
+                     style="background: var(--primary-bg); border: 1px solid color-mix(in srgb, var(--primary) 35%, transparent);">
+                  <span class="text-sm font-medium" style="color: var(--primary-light);">已選 {{ selectedCount() }} 項</span>
+                  <button (click)="batchSaveSelected()" class="sd-btn sd-btn-warn text-xs" style="padding: 0.25rem 0.5rem;">收藏選中</button>
+                  <button (click)="copySelectedIds()" class="sd-btn sd-btn-ghost text-xs" style="padding: 0.25rem 0.5rem;">複製 ID</button>
+                  <button (click)="batchExtractSelected()" class="sd-btn sd-btn-monitor text-xs" style="padding: 0.25rem 0.5rem;">批量提取</button>
+                  <button (click)="batchAddToMonitoring()" class="sd-btn sd-btn-extract text-xs" style="padding: 0.25rem 0.5rem;">批量監控</button>
                   @if (initialView() === 'resource-center') {
-                    <button (click)="batchUnsaveSelected()" 
-                            class="px-2 py-1 text-xs bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded transition-all">
-                      🗑️ 取消收藏
-                    </button>
+                    <button (click)="batchUnsaveSelected()" class="sd-btn text-xs"
+                            style="padding: 0.25rem 0.5rem; background: var(--error-bg); color: var(--error);">取消收藏</button>
                   }
                 </div>
               }
@@ -673,13 +634,13 @@ export interface Account {
           <!-- 搜索中骨架屏 -->
           <div class="space-y-4">
             @for (i of [1,2,3,4,5]; track i) {
-              <div class="animate-pulse bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
+              <div class="sd-card animate-pulse p-4">
                 <div class="flex items-start gap-4">
-                  <div class="w-12 h-12 bg-slate-700 rounded-lg"></div>
+                  <div class="w-12 h-12 rounded-lg" style="background: var(--bg-tertiary);"></div>
                   <div class="flex-1 space-y-2">
-                    <div class="h-5 bg-slate-700 rounded w-1/3"></div>
-                    <div class="h-4 bg-slate-700 rounded w-1/4"></div>
-                    <div class="h-3 bg-slate-700 rounded w-2/3"></div>
+                    <div class="h-5 rounded w-1/3" style="background: var(--bg-tertiary);"></div>
+                    <div class="h-4 rounded w-1/4" style="background: var(--bg-tertiary);"></div>
+                    <div class="h-3 rounded w-2/3" style="background: var(--bg-tertiary);"></div>
                   </div>
                 </div>
               </div>
@@ -774,48 +735,50 @@ export interface Account {
           <!-- 結果列表 -->
           <div class="space-y-3">
             @for (resource of pagedResources(); track getResourceTrackId(resource, $index)) {
-              <div class="group bg-gradient-to-r from-slate-800/80 to-slate-800/40 rounded-xl border transition-all duration-300 overflow-hidden cursor-pointer"
-                   [class]="isSelectedForBatch(resource) ? 'border-cyan-500/70 shadow-lg shadow-cyan-500/10' : 'border-slate-700/50 hover:border-cyan-500/50 hover:shadow-lg hover:shadow-cyan-500/10'"
+              <div class="sd-card group"
+                   [class.is-selected]="isSelectedForBatch(resource)"
                    (click)="openDetail(resource)">
                 <div class="p-4 flex items-start gap-4">
-                  <!-- 🆕 批量選擇複選框 -->
                   <div class="flex-shrink-0 flex flex-col gap-2">
                     <label class="relative cursor-pointer" (click)="$event.stopPropagation()">
-                      <input type="checkbox" 
+                      <input type="checkbox"
                              [checked]="isSelectedForBatch(resource)"
                              (change)="toggleBatchSelect(resource, $event)"
                              class="sr-only">
                       <div class="w-5 h-5 rounded border-2 flex items-center justify-center transition-all"
-                           [class]="isSelectedForBatch(resource) ? 'bg-cyan-500 border-cyan-500' : 'border-slate-500 hover:border-cyan-400'">
+                           [style.background]="isSelectedForBatch(resource) ? 'var(--primary)' : 'transparent'"
+                           [style.border-color]="isSelectedForBatch(resource) ? 'var(--primary)' : 'var(--border-light)'">
                         @if (isSelectedForBatch(resource)) {
                           <span class="text-white text-xs">✓</span>
                         }
                       </div>
                     </label>
-                    <!-- 收藏按鈕 -->
                     <button (click)="toggleSave(resource); $event.stopPropagation()"
-                            class="p-2 rounded-lg transition-all"
-                            [class]="resource.is_saved ? 'bg-yellow-500/20 text-yellow-400' : 'bg-slate-700/50 text-slate-400 hover:bg-yellow-500/20 hover:text-yellow-400'"
-                            [title]="resource.is_saved ? '取消收藏' : '收藏'">
-                      {{ resource.is_saved ? '⭐' : '☆' }}
+                            class="sd-btn p-2"
+                            [class.sd-btn-warn]="!!resource.is_saved"
+                            [class.sd-btn-ghost]="!resource.is_saved"
+                            [title]="resource.is_saved ? '取消收藏' : '收藏'"
+                            style="padding: 0.5rem;">
+                      <svg class="sd-ico" viewBox="0 0 24 24" [attr.fill]="resource.is_saved ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                      </svg>
                     </button>
-                    <!-- 🔧 Phase3: 標籤按鈕（僅已收藏資源顯示）-->
                     @if (resource.is_saved) {
                       <button (click)="openTagEditor(resource, $event)"
-                              class="p-2 rounded-lg bg-slate-700/50 text-slate-400 hover:bg-amber-500/20 hover:text-amber-400 transition-all"
-                              title="管理標籤">
-                        🏷️
+                              class="sd-btn sd-btn-ghost p-2" title="管理標籤" style="padding: 0.5rem;">
+                        <svg class="sd-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                          <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/>
+                        </svg>
                       </button>
                     }
                   </div>
-                  
-                  <!-- 主要信息 -->
+
                   <div class="flex-1 min-w-0">
-                    <!-- 第一行：類型 + 新發現標記 + 標題 + Username -->
                     <div class="flex items-center gap-2 mb-2 flex-wrap">
-                      <span class="px-2.5 py-1 text-xs rounded-full font-medium flex-shrink-0" 
-                            [class]="resource.resource_type === 'channel' ? 'bg-purple-500/30 text-purple-300' : 'bg-blue-500/30 text-blue-300'">
-                        {{ resource.resource_type === 'channel' ? '📢 頻道' : '👥 群組' }}
+                      <span class="px-2.5 py-1 text-xs rounded-full font-medium flex-shrink-0"
+                            [style.background]="resource.resource_type === 'channel' ? 'color-mix(in srgb, var(--accent) 25%, transparent)' : 'var(--info-bg)'"
+                            [style.color]="resource.resource_type === 'channel' ? 'var(--accent-light)' : 'var(--info)'">
+                        {{ resource.resource_type === 'channel' ? '頻道' : '群組' }}
                       </span>
                       
                       <!-- 🔧 P1: 統一狀態標識 -->
@@ -833,18 +796,15 @@ export interface Account {
                         </span>
                       }
                       
-                      <!-- 🆕 新發現/已知標記 -->
                       @if (resource.is_new) {
-                        <span class="px-2 py-0.5 text-xs rounded-full font-medium bg-cyan-500/30 text-cyan-300 flex-shrink-0 animate-pulse">
-                          🆕 新發現
-                        </span>
+                        <span class="px-2 py-0.5 text-xs rounded-full font-medium flex-shrink-0 animate-pulse"
+                              style="background: var(--primary-bg); color: var(--primary-light);">新發現</span>
                       } @else if (resource.is_new === false) {
-                        <span class="px-2 py-0.5 text-xs rounded-full font-medium bg-slate-600/30 text-slate-400 flex-shrink-0">
-                          🔄 已知
-                        </span>
+                        <span class="px-2 py-0.5 text-xs rounded-full font-medium flex-shrink-0"
+                              style="background: var(--bg-tertiary); color: var(--text-muted);">已知</span>
                       }
                       
-                      <h4 class="font-semibold text-white truncate">{{ resource.title }}</h4>
+                      <h4 class="font-semibold truncate" style="color: var(--text-primary);">{{ resource.title }}</h4>
                       @if (resource.username) {
                         <a [href]="'https://t.me/' + resource.username" target="_blank" 
                            class="text-cyan-400 text-sm hover:underline flex-shrink-0"
@@ -854,30 +814,22 @@ export interface Account {
                       }
                     </div>
                     
-                    <!-- 🆕 第二行：群組 ID + 可達性標記 -->
-                    <div class="flex items-center gap-3 mb-2 bg-slate-900/50 rounded-lg px-3 py-2">
-                      <span class="text-slate-400 text-sm">ID:</span>
+                    <div class="sd-meta flex items-center gap-3 mb-2 px-3 py-2">
+                      <span class="text-sm">ID:</span>
                       @if (resource.telegram_id) {
-                        <code class="font-mono text-cyan-300 text-sm select-all">{{ resource.telegram_id }}</code>
+                        <code class="font-mono text-sm select-all" style="color: var(--primary-light);">{{ resource.telegram_id }}</code>
                         <button (click)="copyId(resource, $event)"
-                                class="px-2 py-1 text-xs rounded transition-all"
-                                [class]="copiedId() === resource.telegram_id ? 'bg-green-500/20 text-green-400' : 'bg-slate-700 text-slate-400 hover:bg-cyan-500/20 hover:text-cyan-400'"
-                                title="複製 ID">
-                          {{ copiedId() === resource.telegram_id ? '✓ 已複製' : '📋 複製' }}
+                                class="sd-btn sd-btn-ghost text-xs" style="padding: 0.25rem 0.5rem;" title="複製 ID">
+                          {{ copiedId() === resource.telegram_id ? '已複製' : '複製' }}
                         </button>
                       } @else if (resource.username) {
-                        <code class="font-mono text-slate-400 text-sm">@{{ resource.username }}</code>
-                        <span class="text-xs text-blue-400/80 bg-blue-500/10 px-2 py-0.5 rounded" title="加入後自動獲取數字 ID">
-                          加入後自動獲取
-                        </span>
+                        <code class="font-mono text-sm" style="color: var(--text-muted);">@{{ resource.username }}</code>
+                        <span class="text-xs px-2 py-0.5 rounded" style="background: var(--info-bg); color: var(--info);" title="加入後自動獲取數字 ID">加入後自動獲取</span>
                       } @else if (resource.invite_link || resource.link) {
-                        <span class="text-xs text-blue-400/80 bg-blue-500/10 px-2 py-0.5 rounded">
-                          有邀請鏈接，可加入
-                        </span>
+                        <span class="text-xs px-2 py-0.5 rounded" style="background: var(--info-bg); color: var(--info);">有邀請鏈接，可加入</span>
                       } @else {
-                        <span class="text-slate-500 text-sm bg-red-500/10 px-2 py-0.5 rounded text-red-400/60">信息不完整</span>
+                        <span class="text-sm px-2 py-0.5 rounded" style="background: var(--error-bg); color: var(--error);">信息不完整</span>
                       }
-                      <!-- 可達性 chip -->
                       <span class="text-xs px-2 py-0.5 rounded"
                             [ngClass]="{
                               'bg-green-500/10 text-green-400': (resource.accessibility || getAccessibility(resource)) === 'public',
@@ -888,26 +840,21 @@ export interface Account {
                         {{ getAccessibilityLabel(resource) }}
                       </span>
                       @if (resource.username) {
-                        <span class="text-slate-600">|</span>
                         <button (click)="copyLink(resource, $event)"
-                                class="px-2 py-1 text-xs rounded transition-all"
-                                [class]="copiedLink() === resource.username ? 'bg-green-500/20 text-green-400' : 'bg-slate-700 text-slate-400 hover:bg-cyan-500/20 hover:text-cyan-400'"
-                                title="複製連結">
-                          {{ copiedLink() === resource.username ? '✓ 已複製' : '🔗 複製連結' }}
+                                class="sd-btn sd-btn-ghost text-xs" style="padding: 0.25rem 0.5rem;" title="複製連結">
+                          {{ copiedLink() === resource.username ? '已複製' : '複製連結' }}
                         </button>
                       }
                     </div>
-                    
-                    <!-- 描述 -->
+
                     @if (resource.description) {
-                      <p class="text-slate-400 text-sm mb-2 line-clamp-2">{{ resource.description }}</p>
+                      <p class="text-sm mb-2 line-clamp-2" style="color: var(--text-muted);">{{ resource.description }}</p>
                     }
-                    
-                    <!-- 統計信息 -->
-                    <div class="flex items-center gap-4 text-sm flex-wrap">
-                      <span class="flex items-center gap-1 text-slate-400">
-                        <span class="text-lg">👥</span>
-                        <span class="font-medium text-white">{{ resource.member_count | number }}</span>
+
+                    <div class="flex items-center gap-4 text-sm flex-wrap" style="color: var(--text-muted);">
+                      <span class="flex items-center gap-1">
+                        <svg class="sd-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                        <span class="font-medium" style="color: var(--text-primary);">{{ resource.member_count | number }}</span>
                         成員
                         <!-- 🆕 成員數變化標記 -->
                         @if (resource.member_change && resource.member_change > 0) {
@@ -921,21 +868,15 @@ export interface Account {
                         }
                       </span>
                       
-                      <!-- 相關度評分（帶分數顯示） -->
                       <span class="flex items-center gap-1.5">
                         @if ((resource.overall_score || 0) >= 0.7) {
-                          <span class="text-yellow-400">⭐⭐⭐</span>
-                          <span class="text-yellow-400 font-medium">高度相關</span>
+                          <span class="font-medium" style="color: var(--warning);">高度相關</span>
                         } @else if ((resource.overall_score || 0) >= 0.5) {
-                          <span class="text-yellow-400">⭐⭐</span>
-                          <span class="text-slate-400">中度相關</span>
+                          <span style="color: var(--text-secondary);">中度相關</span>
                         } @else {
-                          <span class="text-yellow-400">⭐</span>
-                          <span class="text-slate-500">一般相關</span>
+                          <span style="color: var(--text-muted);">一般相關</span>
                         }
-                        <span class="text-xs text-slate-500 font-mono">
-                          ({{ formatScore(resource.overall_score) }})
-                        </span>
+                        <span class="text-xs font-mono" style="color: var(--text-disabled);">({{ formatScore(resource.overall_score) }})</span>
                       </span>
                       
                       <!-- 來源標記 (支持多來源合併顯示) -->
@@ -945,9 +886,7 @@ export interface Account {
                             {{ getSourceLabel(src) }}
                           </span>
                         }
-                        <span class="px-1.5 py-0.5 bg-emerald-500/20 text-emerald-400 rounded text-xs" title="多來源驗證">
-                          🔗 多源
-                        </span>
+                        <span class="px-1.5 py-0.5 rounded text-xs" style="background: var(--success-bg); color: var(--success);" title="多來源驗證">多源</span>
                       } @else if (resource.source) {
                         <span class="px-2 py-0.5 bg-slate-700/50 text-slate-400 rounded text-xs">
                           {{ getSourceLabel(resource.source) }}
@@ -967,101 +906,66 @@ export interface Account {
                       
                       <!-- 🔧 Phase3: 標籤顯示 -->
                       @for (tag of getResourceTags(resource); track tag) {
-                        <span class="px-2 py-0.5 bg-amber-500/15 text-amber-400 rounded text-xs">
-                          🏷️ {{ tag }}
-                        </span>
+                        <span class="px-2 py-0.5 rounded text-xs" style="background: var(--warning-bg); color: var(--warning);">{{ tag }}</span>
                       }
                     </div>
                   </div>
                   
-                  <!-- 操作按鈕 -->
+                  <!-- 主 CTA：線性圖標 + token 按鈕（獲客鏈路關鍵動作） -->
                   <div class="flex-shrink-0 flex flex-col gap-2" (click)="$event.stopPropagation()">
                     @if (resource.status === 'monitoring') {
-                      <!-- 監控中狀態 -->
-                      <div class="flex flex-col items-center">
-                        <span class="px-4 py-2 bg-green-500/20 text-green-400 rounded-lg text-sm text-center">
-                          ✅ 已加入
-                        </span>
-                        <span class="px-4 py-1.5 bg-emerald-500/15 text-emerald-400 rounded-lg text-xs text-center mt-1">
-                          📡 監控中
-                        </span>
+                      <div class="flex flex-col items-center gap-1">
+                        <span class="sd-status">已加入</span>
+                        <span class="sd-btn sd-btn-monitor text-xs" style="padding: 0.375rem 0.75rem; pointer-events: none;">監控中</span>
                         @if (resource.joined_phone) {
-                          <span class="text-xs text-slate-500 mt-1">{{ resource.joined_phone.slice(0, 7) }}***</span>
+                          <span class="text-xs mt-0.5" style="color: var(--text-disabled);">{{ resource.joined_phone.slice(0, 7) }}***</span>
                         }
                       </div>
                     } @else if (resource.status === 'joined') {
-                      <!-- 已加入但未監控 -->
                       <div class="flex flex-col items-center">
-                        <span class="px-4 py-2 bg-green-500/20 text-green-400 rounded-lg text-sm text-center">
-                          ✅ 已加入
-                        </span>
+                        <span class="sd-status">已加入</span>
                         @if (resource.joined_phone) {
-                          <span class="text-xs text-slate-500 mt-1">{{ resource.joined_phone.slice(0, 7) }}***</span>
+                          <span class="text-xs mt-1" style="color: var(--text-disabled);">{{ resource.joined_phone.slice(0, 7) }}***</span>
                         }
                       </div>
                       @if (isAddingMonitor(resource)) {
-                        <button disabled
-                                class="px-4 py-2 bg-emerald-500/10 text-emerald-400/60 rounded-lg text-sm cursor-wait flex items-center gap-1">
-                          <span class="animate-spin">⏳</span> 添加中...
-                        </button>
+                        <button disabled class="sd-btn sd-btn-monitor">添加中...</button>
                       } @else {
-                        <button (click)="addToMonitoring(resource)" 
-                                class="px-4 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 rounded-lg text-sm transition-all">
-                          📡 加入監控
+                        <button (click)="addToMonitoring(resource)" class="sd-btn sd-btn-monitor">
+                          <svg class="sd-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                          加入監控
                         </button>
                       }
                     } @else if (isJoining(resource)) {
-                      <button disabled
-                              class="px-4 py-2 bg-slate-600 text-slate-300 rounded-lg text-sm font-medium cursor-wait flex items-center gap-1">
-                        <span class="animate-spin">⏳</span> 加入中...
-                      </button>
+                      <button disabled class="sd-btn sd-btn-ghost">加入中...</button>
                     } @else if (!canJoin(resource)) {
-                      <!-- 🔧 不可操作群組：按鈕置灰 -->
-                      <button disabled
-                              class="px-4 py-2 bg-slate-600/30 text-slate-500 rounded-lg text-sm cursor-not-allowed"
-                              title="該群組信息不完整，無法加入">
-                        🚫 無法加入
-                      </button>
+                      <button disabled class="sd-btn sd-btn-ghost" title="該群組信息不完整，無法加入">無法加入</button>
                     } @else {
-                      <!-- 未加入：顯示加入和加入並監控兩個選項 -->
-                      <button (click)="openJoinDialog(resource)" 
-                              class="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-white rounded-lg text-sm font-medium transition-all shadow-lg shadow-cyan-500/20">
-                        🚀 加入
+                      <button (click)="openJoinDialog(resource)" class="sd-btn sd-btn-join">
+                        <svg class="sd-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+                        加入
                       </button>
                       @if (isAddingMonitor(resource)) {
-                        <button disabled
-                                class="px-4 py-2 bg-emerald-500/10 text-emerald-400/60 rounded-lg text-sm cursor-wait flex items-center gap-1"
-                                title="正在添加到監控列表...">
-                          <span class="animate-spin">⏳</span> 監控中...
-                        </button>
+                        <button disabled class="sd-btn sd-btn-monitor" title="正在添加到監控列表...">添加中...</button>
                       } @else {
-                        <button (click)="addToMonitoring(resource)" 
-                                class="px-4 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 rounded-lg text-sm transition-all"
-                                title="直接添加到監控群組列表">
-                          📡 監控
+                        <button (click)="addToMonitoring(resource)" class="sd-btn sd-btn-monitor" title="直接添加到監控群組列表">
+                          <svg class="sd-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                          監控
                         </button>
                       }
                     }
-                    
+
                     @if (resource.resource_type !== 'channel') {
                       @if (resource.status === 'joined' || resource.status === 'monitoring') {
-                        <button (click)="extractMembers(resource)" 
-                                class="px-4 py-2 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 rounded-lg text-sm transition-all">
-                          👥 提取成員
+                        <button (click)="extractMembers(resource)" class="sd-btn sd-btn-extract">
+                          <svg class="sd-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                          提取成員
                         </button>
                       } @else {
-                        <button disabled
-                                class="px-4 py-2 bg-slate-500/20 text-slate-500 rounded-lg text-sm cursor-not-allowed"
-                                title="需要先加入群組才能提取成員">
-                          👥 成員
-                        </button>
+                        <button disabled class="sd-btn sd-btn-ghost" title="需要先加入群組才能提取成員">成員</button>
                       }
                     } @else {
-                      <button disabled
-                              class="px-4 py-2 bg-slate-500/20 text-slate-500 rounded-lg text-sm cursor-not-allowed"
-                              title="頻道無法提取成員">
-                        👥 成員 🔒
-                      </button>
+                      <button disabled class="sd-btn sd-btn-ghost" title="頻道無法提取成員">成員</button>
                     }
                   </div>
                 </div>
@@ -1364,66 +1268,38 @@ export interface Account {
               </div>
             </div>
             
-            <!-- 彈窗底部操作欄 -->
-            <div class="px-6 py-4 border-t border-slate-700 bg-slate-800/95 flex items-center justify-between">
+            <!-- 彈窗底部操作欄（與列表卡同一套 sd-btn） -->
+            <div class="px-6 py-4 flex items-center justify-between"
+                 style="border-top: 1px solid var(--border-default); background: color-mix(in srgb, var(--bg-card) 95%, transparent);">
               <div class="flex items-center gap-2">
                 <button (click)="toggleSave(resource)"
-                        class="px-4 py-2 rounded-lg transition-all flex items-center gap-2"
-                        [class]="resource.is_saved ? 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'">
-                  {{ resource.is_saved ? '⭐ 已收藏' : '☆ 收藏' }}
+                        class="sd-btn"
+                        [class.sd-btn-warn]="!!resource.is_saved"
+                        [class.sd-btn-ghost]="!resource.is_saved">
+                  {{ resource.is_saved ? '已收藏' : '收藏' }}
                 </button>
                 @if (resource.username) {
-                  <a [href]="'https://t.me/' + resource.username" target="_blank"
-                     class="px-4 py-2 bg-slate-700 text-slate-300 hover:bg-slate-600 rounded-lg flex items-center gap-2">
-                    🔗 打開 Telegram
-                  </a>
+                  <a [href]="'https://t.me/' + resource.username" target="_blank" class="sd-btn sd-btn-ghost">打開 Telegram</a>
                 }
               </div>
               <div class="flex items-center gap-2">
-                <button (click)="closeDetail()"
-                        class="px-4 py-2 bg-slate-700 text-slate-300 hover:bg-slate-600 rounded-lg">
-                  關閉
-                </button>
-                
+                <button (click)="closeDetail()" class="sd-btn sd-btn-ghost">關閉</button>
                 @if (resource.status !== 'joined' && resource.status !== 'monitoring') {
                   @if (canJoin(resource)) {
-                    <!-- 可加入：加入 + 監控 -->
-                    <button (click)="addToMonitoring(resource); closeDetail()"
-                            class="px-5 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 rounded-lg font-medium transition-all">
-                      📡 監控
-                    </button>
-                    <button (click)="openJoinDialog(resource); closeDetail()"
-                            class="px-6 py-2 bg-cyan-500 hover:bg-cyan-400 text-white rounded-lg font-medium transition-all shadow-lg shadow-cyan-500/20">
-                      🚀 加入群組
-                    </button>
+                    <button (click)="addToMonitoring(resource); closeDetail()" class="sd-btn sd-btn-monitor">監控</button>
+                    <button (click)="openJoinDialog(resource); closeDetail()" class="sd-btn sd-btn-join">加入群組</button>
                   } @else {
-                    <!-- 不可加入 -->
-                    <span class="px-4 py-2 bg-red-500/10 text-red-400/60 rounded-lg text-sm">
-                      信息不完整，無法加入
-                    </span>
+                    <span class="text-sm px-3 py-2 rounded-lg" style="background: var(--error-bg); color: var(--error);">信息不完整，無法加入</span>
                   }
                 } @else if (resource.status === 'joined') {
-                  <!-- 已加入未監控：加入監控 + 提取成員 -->
-                  <button (click)="addToMonitoring(resource); closeDetail()"
-                          class="px-5 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-medium transition-all">
-                    📡 加入監控
-                  </button>
+                  <button (click)="addToMonitoring(resource); closeDetail()" class="sd-btn sd-btn-monitor">加入監控</button>
                   @if (resource.resource_type !== 'channel') {
-                    <button (click)="extractMembers(resource); closeDetail()"
-                            class="px-6 py-2 bg-purple-500 hover:bg-purple-400 text-white rounded-lg font-medium transition-all">
-                      👥 提取成員
-                    </button>
+                    <button (click)="extractMembers(resource); closeDetail()" class="sd-btn sd-btn-extract">提取成員</button>
                   }
                 } @else {
-                  <!-- 監控中：顯示狀態 + 提取成員 -->
-                  <span class="px-4 py-2 bg-emerald-500/15 text-emerald-400 rounded-lg text-sm font-medium">
-                    📡 監控中
-                  </span>
+                  <span class="sd-btn sd-btn-monitor" style="pointer-events: none;">監控中</span>
                   @if (resource.resource_type !== 'channel') {
-                    <button (click)="extractMembers(resource); closeDetail()"
-                            class="px-6 py-2 bg-purple-500 hover:bg-purple-400 text-white rounded-lg font-medium transition-all">
-                      👥 提取成員
-                    </button>
+                    <button (click)="extractMembers(resource); closeDetail()" class="sd-btn sd-btn-extract">提取成員</button>
                   }
                 }
               </div>
@@ -1439,9 +1315,9 @@ export interface Account {
           <div class="bg-slate-800 rounded-2xl border border-slate-700 shadow-2xl w-[420px] max-h-[80vh] overflow-hidden"
                (click)="$event.stopPropagation()">
             <!-- 標題 -->
-            <div class="p-5 border-b border-slate-700 bg-gradient-to-r from-cyan-500/10 to-blue-500/10">
-              <h3 class="text-lg font-bold text-white flex items-center gap-2">
-                🚀 選擇加入帳號
+            <div class="p-5" style="border-bottom: 1px solid var(--border-default); background: var(--primary-bg);">
+              <h3 class="text-lg font-bold flex items-center gap-2" style="color: var(--text-primary);">
+                選擇加入帳號
               </h3>
               @if (joinDialogResource(); as resource) {
                 <p class="text-sm text-slate-400 mt-1 truncate">{{ resource.title }}</p>
@@ -1579,33 +1455,136 @@ export interface Account {
       display: block;
       height: 100%;
     }
-    
+
+    /* Token 橋接：結果區/工具條/主 CTA 走主題變量，避免逐行改 slate 類 */
+    .sd-page {
+      background: var(--bg-primary);
+      color: var(--text-primary);
+    }
+    .sd-chrome {
+      background: color-mix(in srgb, var(--bg-secondary) 85%, transparent);
+      border-color: var(--border-default);
+    }
+    .sd-toolbar {
+      background: color-mix(in srgb, var(--bg-secondary) 55%, transparent);
+      border-color: var(--border-default);
+      color: var(--text-secondary);
+    }
+    .sd-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-default);
+      border-radius: 0.75rem;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      cursor: pointer;
+      overflow: hidden;
+    }
+    .sd-card:hover {
+      border-color: color-mix(in srgb, var(--primary) 55%, var(--border-default));
+      box-shadow: var(--shadow-md);
+    }
+    .sd-card.is-selected {
+      border-color: color-mix(in srgb, var(--primary) 75%, var(--border-default));
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary) 35%, transparent);
+    }
+    .sd-meta {
+      background: color-mix(in srgb, var(--bg-primary) 70%, transparent);
+      border-radius: 0.5rem;
+      color: var(--text-muted);
+    }
+    .sd-ico {
+      width: 1rem;
+      height: 1rem;
+      flex-shrink: 0;
+    }
+    .sd-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.375rem;
+      border-radius: 0.5rem;
+      font-size: 0.875rem;
+      font-weight: 500;
+      padding: 0.5rem 1rem;
+      transition: filter 0.15s ease, background-color 0.15s ease, opacity 0.15s ease;
+      border: 1px solid transparent;
+    }
+    .sd-btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+    .sd-btn-join {
+      background: var(--primary);
+      color: #fff;
+      box-shadow: var(--shadow-sm);
+    }
+    .sd-btn-join:hover:not(:disabled) { filter: brightness(1.08); }
+    .sd-btn-monitor {
+      background: var(--success-bg);
+      color: var(--success);
+      border-color: color-mix(in srgb, var(--success) 35%, transparent);
+    }
+    .sd-btn-monitor:hover:not(:disabled) { filter: brightness(1.1); }
+    .sd-btn-extract {
+      background: color-mix(in srgb, var(--accent) 18%, transparent);
+      color: var(--accent-light);
+      border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+    }
+    .sd-btn-extract:hover:not(:disabled) { filter: brightness(1.1); }
+    .sd-btn-ghost {
+      background: var(--bg-tertiary);
+      color: var(--text-secondary);
+      border-color: var(--border-default);
+    }
+    .sd-btn-ghost:hover:not(:disabled) {
+      color: var(--text-primary);
+      border-color: var(--border-light);
+    }
+    .sd-btn-warn {
+      background: var(--warning-bg);
+      color: var(--warning);
+      border-color: color-mix(in srgb, var(--warning) 35%, transparent);
+    }
+    .sd-status {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.375rem;
+      border-radius: 0.5rem;
+      font-size: 0.875rem;
+      padding: 0.5rem 1rem;
+      background: var(--success-bg);
+      color: var(--success);
+    }
+    .sd-input, .sd-select {
+      background: var(--bg-input);
+      border: 1px solid var(--border-default);
+      color: var(--text-primary);
+      border-radius: 0.5rem;
+    }
+    .sd-input:focus, .sd-select:focus {
+      outline: none;
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 2px var(--primary-bg);
+    }
+
     .line-clamp-2 {
       display: -webkit-box;
       -webkit-line-clamp: 2;
       -webkit-box-orient: vertical;
       overflow: hidden;
     }
-    
-    /* 自定義滾動條 */
-    ::-webkit-scrollbar {
-      width: 8px;
-    }
-    ::-webkit-scrollbar-track {
-      background: transparent;
-    }
+
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb {
-      background: rgba(100, 116, 139, 0.3);
+      background: color-mix(in srgb, var(--text-disabled) 45%, transparent);
       border-radius: 4px;
     }
     ::-webkit-scrollbar-thumb:hover {
-      background: rgba(100, 116, 139, 0.5);
+      background: color-mix(in srgb, var(--text-muted) 55%, transparent);
     }
-    
-    /* Phase3: 操作歷史面板滑入動畫 */
-    .animate-slideDown {
-      animation: slideDown 0.2s ease-out;
-    }
+
+    .animate-slideDown { animation: slideDown 0.2s ease-out; }
     @keyframes slideDown {
       from { max-height: 0; opacity: 0; overflow: hidden; }
       to { max-height: 200px; opacity: 1; }
@@ -1838,12 +1817,12 @@ export class SearchDiscoveryComponent implements OnInit, OnDestroy {
   // 🆕 批量選擇狀態
   selectedForBatch = signal<Set<string>>(new Set());
   
-  // 搜索渠道配置
+  // 搜索渠道配置（icon 改短標籤，避免 emoji 噪音）
   searchSources = [
-    { id: 'telegram' as SearchSource, name: '官方搜索', icon: '📱', tag: '穩定', tagClass: 'bg-green-500/20 text-green-400', disabled: false },
-    { id: 'jiso' as SearchSource, name: '中文搜索', icon: '🔍', tag: '推薦', tagClass: 'bg-yellow-500/20 text-yellow-400', disabled: false },
-    { id: 'tgstat' as SearchSource, name: 'TGStat', icon: '📊', tag: '開發中', tagClass: 'bg-slate-600 text-slate-400', disabled: true },
-    { id: 'local' as SearchSource, name: '本地索引', icon: '💾', tag: null, tagClass: '', disabled: false }
+    { id: 'telegram' as SearchSource, name: '官方搜索', icon: 'TG', tag: '穩定', tagClass: 'bg-green-500/20 text-green-400', disabled: false },
+    { id: 'jiso' as SearchSource, name: '中文搜索', icon: '中', tag: '推薦', tagClass: 'bg-yellow-500/20 text-yellow-400', disabled: false },
+    { id: 'tgstat' as SearchSource, name: 'TGStat', icon: 'TS', tag: '開發中', tagClass: 'bg-slate-600 text-slate-400', disabled: true },
+    { id: 'local' as SearchSource, name: '本地索引', icon: '本', tag: null, tagClass: '', disabled: false }
   ];
   
   // 熱門關鍵詞

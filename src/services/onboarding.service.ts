@@ -289,6 +289,11 @@ export class OnboardingService {
     const progress = this._progress().get(tourId);
     return progress?.completed || false;
   }
+
+  /** 讀取指定 tour 的進度（設定頁「上手旅程」面板用） */
+  getProgress(tourId: string): OnboardingProgress | null {
+    return this._progress().get(tourId) ?? null;
+  }
   
   /**
    * 重置引導

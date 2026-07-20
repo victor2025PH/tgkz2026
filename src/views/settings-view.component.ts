@@ -4,7 +4,7 @@
  *
  * 🆕 側欄優化：通知與提醒、使用幫助、語言與外觀統一在此；支持 ?tab= 深鏈
  */
-import { Component, inject, signal, OnInit, OnDestroy, ChangeDetectionStrategy } from '@angular/core';
+import { Component, inject, signal, computed, OnInit, OnDestroy, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
@@ -184,6 +184,61 @@ export type SettingsTab = 'appearance' | 'notifications' | 'help' | 'backup' | '
                     class="px-4 py-2.5 bg-gradient-to-r from-purple-500/20 to-pink-500/20 hover:from-purple-500/30 hover:to-pink-500/30 border border-purple-500/40 text-purple-400 rounded-xl transition-all text-sm font-medium">
               重看頁面導覽
             </button>
+          </div>
+        </div>
+
+        <!-- 上手旅程回顧（數據來自本機漏斗埋點，無需後端查詢） -->
+        <div class="bg-slate-900/50 backdrop-blur-sm border border-slate-700 p-6 rounded-xl shadow-lg mb-6">
+          <div class="flex items-center justify-between mb-1">
+            <h3 class="text-lg font-semibold text-white">上手旅程</h3>
+            <button (click)="refreshJourney()"
+                    class="text-xs px-3 py-1.5 rounded-lg transition-colors"
+                    style="background: var(--bg-tertiary); color: var(--text-secondary); border: 1px solid var(--border-default);">
+              刷新
+            </button>
+          </div>
+          <p class="text-slate-400 text-sm mb-5">你的獲客鏈路走到哪一步、每步何時完成（數據記錄在本機）</p>
+
+          <!-- 5 步時間線 -->
+          <div class="space-y-2 mb-5">
+            @for (step of journeySteps(); track step.id; let i = $index; let last = $last) {
+              <div class="flex items-start gap-3">
+                <div class="flex flex-col items-center">
+                  <span class="flex items-center justify-center w-6 h-6 rounded-full text-[10px] font-bold shrink-0"
+                        [style.background]="step.doneAt ? 'var(--success)' : 'var(--bg-tertiary)'"
+                        [style.color]="step.doneAt ? '#fff' : 'var(--text-muted)'">
+                    @if (step.doneAt) { ✓ } @else { {{ i + 1 }} }
+                  </span>
+                  @if (!last) {
+                    <span class="w-px h-5 mt-0.5" [style.background]="step.doneAt ? 'var(--success)' : 'var(--border-default)'"></span>
+                  }
+                </div>
+                <div class="flex-1 min-w-0 flex items-center justify-between gap-3 pb-1">
+                  <span class="text-sm" [style.color]="step.doneAt ? 'var(--text-primary)' : 'var(--text-muted)'">{{ step.label }}</span>
+                  <span class="text-xs shrink-0" style="color: var(--text-disabled);">
+                    @if (step.doneAt) { {{ step.doneAt | date:'MM-dd HH:mm' }} } @else { 未完成 }
+                  </span>
+                </div>
+              </div>
+            }
+          </div>
+
+          <!-- 摘要行：總耗時 + 導覽狀態 -->
+          <div class="flex flex-wrap gap-3 text-xs">
+            <span class="px-3 py-1.5 rounded-lg"
+                  style="background: var(--bg-tertiary); color: var(--text-secondary); border: 1px solid var(--border-default);">
+              @if (journeyTotalMs() !== null) {
+                從第一步到跑通：{{ formatDuration(journeyTotalMs()!) }}
+              } @else {
+                鏈路尚未跑通（{{ journeyDoneCount() }}/5）
+              }
+            </span>
+            <span class="px-3 py-1.5 rounded-lg"
+                  [style.background]="tourStatus().tone === 'success' ? 'var(--success-bg)' : 'var(--bg-tertiary)'"
+                  [style.color]="tourStatus().tone === 'success' ? 'var(--success)' : 'var(--text-secondary)'"
+                  [style.border]="'1px solid var(--border-default)'">
+              監控導覽：{{ tourStatus().label }}
+            </span>
           </div>
         </div>
       }
@@ -446,6 +501,66 @@ export class SettingsViewComponent implements OnInit, OnDestroy {
   replayPageTours(): void {
     this.onboardingTours.resetAll();
     this.toast.success('頁面導覽已重置，進入監控中心即可重看');
+    this.refreshJourney();
+  }
+
+  // ═══════════ 上手旅程回顧（本機漏斗埋點數據） ═══════════
+
+  /** localStorage funnel_steps_done 快照（刷新按鈕/導覽重置時重讀） */
+  private journeyRaw = signal<Record<string, number>>(this.readJourneyRaw());
+
+  private readJourneyRaw(): Record<string, number> {
+    try {
+      return JSON.parse(localStorage.getItem('funnel_steps_done') || '{}');
+    } catch {
+      return {};
+    }
+  }
+
+  refreshJourney(): void {
+    this.journeyRaw.set(this.readJourneyRaw());
+  }
+
+  /** 5 步時間線（標籤復用 dashboardSetup 語言包鍵，與儀表板一致） */
+  journeySteps = computed(() => {
+    const raw = this.journeyRaw();
+    return (['account', 'groups', 'keywords', 'rules', 'monitor'] as const).map(id => ({
+      id,
+      label: this.t(`dashboardSetup.steps.${id}.label`),
+      doneAt: raw[id] ? new Date(raw[id]) : null
+    }));
+  });
+
+  journeyDoneCount = computed(() => this.journeySteps().filter(s => s.doneAt).length);
+
+  /** 第一步完成到全部跑通的耗時；未跑通為 null */
+  journeyTotalMs = computed(() => {
+    const raw = this.journeyRaw();
+    if (!raw['__all__']) return null;
+    const times = this.journeySteps().map(s => s.doneAt?.getTime()).filter((v): v is number => !!v);
+    if (times.length < 5) return null;
+    return raw['__all__'] - Math.min(...times);
+  });
+
+  /** 監控中心 spotlight 導覽狀態 */
+  tourStatus = computed(() => {
+    // journeyRaw 變化（刷新/重置）時一併重算
+    this.journeyRaw();
+    const p = this.onboardingTours.getProgress('monitoring-flow');
+    if (!p) return { label: '尚未觸發', tone: 'muted' as const };
+    if (p.completed) return { label: '已完成', tone: 'success' as const };
+    if (p.skipped) return { label: `在第 ${p.currentStep + 1} 步跳過`, tone: 'muted' as const };
+    return { label: '進行中', tone: 'muted' as const };
+  });
+
+  formatDuration(ms: number): string {
+    const mins = Math.floor(ms / 60000);
+    if (mins < 1) return '不到 1 分鐘';
+    if (mins < 60) return `${mins} 分鐘`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs} 小時 ${mins % 60} 分鐘`;
+    const days = Math.floor(hrs / 24);
+    return `${days} 天 ${hrs % 24} 小時`;
   }
   
   // 翻譯方法

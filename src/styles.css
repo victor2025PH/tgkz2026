@@ -1,0 +1,28 @@
+/* ============================================================
+   全局樣式入口：構建期 Tailwind v4
+   取代 cdn.tailwindcss.com 運行時 JIT（離線時 CDN 掛掉會導致全站佈局崩壞）
+   ============================================================ */
+@import "tailwindcss" source(none);
+
+/* 只掃描源碼與根 index.html；dist/ 未被 gitignore，避免掃到舊構建產物 */
+@source "../src";
+@source "../index.html";
+
+/* ThemeService 在 <html> 上切換 .dark/.light，對齊原 CDN 的 darkMode:'class' */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* 原 CDN 以 ?plugins=forms 載入；form-input/form-select 及 checkbox 的
+   text-* 上色（accent）都依賴此插件，缺了表單控件會回退原生外觀 */
+@plugin "@tailwindcss/forms";
+
+/* v4 preflight 將未指定顏色的邊框設為 currentColor（v3/CDN 為淺灰）。
+   綁定主題 token，恢復可預期的邊框顏色且跟隨深淺主題。 */
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--border-default, currentColor);
+  }
+}

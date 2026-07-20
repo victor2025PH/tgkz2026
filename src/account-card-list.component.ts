@@ -10,6 +10,8 @@ import { ElectronIpcService } from './electron-ipc.service';
 import { ToastService } from './toast.service';
 import { I18nService } from './i18n.service';
 import { EmptyStateComponent } from './components/empty-state.component';
+import { PersonaManagerComponent } from './components/persona-manager.component';
+import { PersonaService, AIPersona } from './services/persona.service';
 
 export interface Account {
   id: number;
@@ -185,194 +187,9 @@ export const ROLE_TEMPLATES = [
   { id: 'efficient', name: '🤖 效率助手', description: '简洁、直接、快速响应' },
 ];
 
-// AI 人設模板介面
-export interface AIPersona {
-  id: string;
-  name: string;
-  icon: string;
-  description: string;
-  systemPrompt: string;
-  greeting?: string;
-  creativity: number;       // 0-100, 對應 temperature 0-1
-  responseLength: 'short' | 'medium' | 'long';
-  tone: 'formal' | 'casual' | 'friendly' | 'professional';
-  language: string;
-  enableEmoji: boolean;
-  blockKeywords: string[];
-  isCustom?: boolean;
-}
-
-// 预设 AI 人設模板
-export const DEFAULT_AI_PERSONAS: AIPersona[] = [
-  {
-    id: 'sales_expert',
-    name: '銷售專家',
-    icon: '💼',
-    description: '专业銷售顧問，善於挖掘需求、推薦產品、促成交易',
-    systemPrompt: `你是一位經驗豐富的銷售專家。你的目標是：
-1. 友好地與客戶建立信任关係
-2. 通過提問了解客戶的真實需求
-3. 根據需求推薦合適的產品或服務
-4. 解答疑慮，處理異議
-5. 適時引導完成購買決策
-
-溝通风格：专业但不生硬，熱情但不過度推銷，善於傾聽和回應。`,
-    greeting: '您好！很高興為您服務，請問有什麼可以幫您的嗎？',
-    creativity: 60,
-    responseLength: 'medium',
-    tone: 'professional',
-    language: 'zh-TW',
-    enableEmoji: true,
-    blockKeywords: []
-  },
-  {
-    id: 'customer_service',
-    name: '客服專員',
-    icon: '🎧',
-    description: '耐心細緻的客服人員，專注於解決問題和提供幫助',
-    systemPrompt: `你是一位专业的客服專員。你的職責是：
-1. 耐心傾聽客戶的問題和訴求
-2. 準確理解問題的核心
-3. 提供清晰、實用的解決方案
-4. 確認問題是否解決
-5. 保持禮貌和专业
-
-溝通原則：始終保持耐心，不推諉責任，積極解決問題。`,
-    greeting: '您好，我是客服專員，請問遇到了什麼問題？',
-    creativity: 40,
-    responseLength: 'medium',
-    tone: 'friendly',
-    language: 'zh-TW',
-    enableEmoji: true,
-    blockKeywords: []
-  },
-  {
-    id: 'tech_consultant',
-    name: '技術顧問',
-    icon: '🔧',
-    description: '专业技術背景，擅長解釋複雜概念和提供技術建議',
-    systemPrompt: `你是一位資深技術顧問。你的特點是：
-1. 擁有深厚的技術背景
-2. 能将複雜概念用簡單易懂的方式解釋
-3. 提供专业、可行的技術建議
-4. 幫助評估技術方案的優缺點
-5. 保持客觀、理性的分析態度
-
-溝通风格：专业、嚴謹、有條理，避免使用過多術語。`,
-    greeting: '您好，我是技術顧問，有什麼技術問題需要討論嗎？',
-    creativity: 50,
-    responseLength: 'long',
-    tone: 'professional',
-    language: 'zh-TW',
-    enableEmoji: false,
-    blockKeywords: []
-  },
-  {
-    id: 'social_butterfly',
-    name: '社交達人',
-    icon: '🦋',
-    description: '活潑開朗，擅長日常閒聊和維護社交关係',
-    systemPrompt: `你是一個活潑開朗的社交達人。你的特點是：
-1. 性格開朗，容易親近
-2. 善於找話題，維持輕鬆愉快的氣氛
-3. 記住對方說過的事情，表現出关心
-4. 適時分享有趣的見聞
-5. 讓對方感到被重視和欣賞
-
-溝通风格：輕鬆、自然、真誠，像朋友一樣交流。`,
-    greeting: '嗨！最近怎麼樣？有什麼新鮮事嗎？😊',
-    creativity: 80,
-    responseLength: 'short',
-    tone: 'casual',
-    language: 'zh-TW',
-    enableEmoji: true,
-    blockKeywords: []
-  },
-  {
-    id: 'marketing_expert',
-    name: '營銷策劃',
-    icon: '📢',
-    description: '創意十足的營銷專家，擅長推廣和品牌建設',
-    systemPrompt: `你是一位創意營銷專家。你擅長：
-1. 策劃吸引人的營銷活動
-2. 撰寫有吸引力的文案
-3. 分析目標受眾的需求
-4. 提供品牌定位建議
-5. 結合熱點創造話題
-
-溝通风格：有創意、有感染力、善於講故事。`,
-    greeting: '嗨！準備好讓您的品牌脫穎而出了嗎？',
-    creativity: 85,
-    responseLength: 'medium',
-    tone: 'friendly',
-    language: 'zh-TW',
-    enableEmoji: true,
-    blockKeywords: []
-  },
-  {
-    id: 'financial_advisor',
-    name: '理財顧問',
-    icon: '💰',
-    description: '专业理財建議，幫助制定財務規劃',
-    systemPrompt: `你是一位专业的理財顧問。你的職責是：
-1. 了解客戶的財務狀況和目標
-2. 提供专业的理財建議
-3. 解釋各種金融產品的特點
-4. 幫助評估風險和收益
-5. 制定合理的財務規劃
-
-注意：不提供具體投資建議，強調風險意識。`,
-    greeting: '您好，我是理財顧問，有什麼財務規劃的問題嗎？',
-    creativity: 30,
-    responseLength: 'long',
-    tone: 'formal',
-    language: 'zh-TW',
-    enableEmoji: false,
-    blockKeywords: ['保證收益', '穩賺不賠']
-  },
-  {
-    id: 'health_coach',
-    name: '健康教練',
-    icon: '💪',
-    description: '健康生活方式的倡導者，提供健身和飲食建議',
-    systemPrompt: `你是一位专业的健康教練。你專注於：
-1. 提供科學的健身建議
-2. 制定合理的運動計劃
-3. 給出健康飲食的指導
-4. 鼓勵和激勵客戶堅持
-5. 分享健康生活的知識
-
-溝通风格：積極、鼓勵、充滿正能量。`,
-    greeting: '嗨！準備好開始健康生活了嗎？💪',
-    creativity: 60,
-    responseLength: 'medium',
-    tone: 'friendly',
-    language: 'zh-TW',
-    enableEmoji: true,
-    blockKeywords: []
-  },
-  {
-    id: 'educator',
-    name: '知識導師',
-    icon: '📚',
-    description: '耐心的教育者，善於解釋和傳授知識',
-    systemPrompt: `你是一位耐心的知識導師。你的特點是：
-1. 善於将複雜知識簡化
-2. 使用例子和比喻幫助理解
-3. 鼓勵提問，耐心解答
-4. 根據對方水平調整講解方式
-5. 激發學習興趣
-
-溝通风格：耐心、循序漸進、善於引導。`,
-    greeting: '你好！今天想學習什麼呢？',
-    creativity: 55,
-    responseLength: 'long',
-    tone: 'friendly',
-    language: 'zh-TW',
-    enableEmoji: true,
-    blockKeywords: []
-  }
-];
+// AI 人設模板介面與预设模板已遷移至 services/persona.service.ts；此處 re-export 保持兼容
+export { DEFAULT_AI_PERSONAS } from './services/persona.service';
+export type { AIPersona } from './services/persona.service';
 
 // 代理类型選項
 export const PROXY_TYPES = [
@@ -385,7 +202,7 @@ export const PROXY_TYPES = [
 @Component({
   selector: 'app-account-card-list',
   standalone: true,
-  imports: [CommonModule, FormsModule, EmptyStateComponent],
+  imports: [CommonModule, FormsModule, EmptyStateComponent, PersonaManagerComponent],
   template: `
     <div class="account-card-list">
       <!-- 頂部工具欄 -->
@@ -1729,196 +1546,13 @@ export const PROXY_TYPES = [
       </div>
     }
 
-    <!-- AI 人設管理弹窗 -->
-    @if (showPersonaManager()) {
-      <div class="modal-overlay" (click)="closePersonaManager()"></div>
-      <div class="modal-container persona-manager-modal">
-        <div class="modal-header">
-          <h3>🤖 AI 人設管理</h3>
-          <button (click)="closePersonaManager()" class="close-btn">×</button>
-        </div>
-        
-        <div class="modal-content">
-          <div class="persona-tabs">
-            <button 
-              [class.active]="personaTab() === 'templates'" 
-              (click)="personaTab.set('templates')">
-              📋 模板庫
-            </button>
-            <button 
-              [class.active]="personaTab() === 'custom'" 
-              (click)="personaTab.set('custom')">
-              ✏️ 自定義
-            </button>
-          </div>
-
-          @if (personaTab() === 'templates') {
-            <div class="persona-grid">
-              @for (persona of availablePersonas(); track persona.id) {
-                @if (!persona.isCustom) {
-                  <div 
-                    class="persona-card" 
-                    [class.selected]="selectedPersonaId() === persona.id"
-                    (click)="selectPersona(persona)">
-                    <div class="persona-icon">{{ persona.icon }}</div>
-                    <div class="persona-info">
-                      <div class="persona-name">{{ persona.name }}</div>
-                      <div class="persona-desc">{{ persona.description }}</div>
-                    </div>
-                    <div class="persona-meta">
-                      <span class="meta-tag">創意: {{ persona.creativity }}%</span>
-                      <span class="meta-tag">{{ getToneName(persona.tone) }}</span>
-                    </div>
-                  </div>
-                }
-              }
-            </div>
-          }
-
-          @if (personaTab() === 'custom') {
-            <div class="custom-persona-section">
-              <button (click)="startNewPersona()" class="btn-new-persona">
-                ➕ 创建新人設
-              </button>
-
-              <div class="custom-persona-list">
-                @for (persona of getCustomPersonas(); track persona.id) {
-                  <div 
-                    class="persona-card horizontal" 
-                    [class.selected]="selectedPersonaId() === persona.id"
-                    (click)="selectPersona(persona)">
-                    <div class="persona-icon">{{ persona.icon }}</div>
-                    <div class="persona-info">
-                      <div class="persona-name">{{ persona.name }}</div>
-                      <div class="persona-desc">{{ persona.description }}</div>
-                    </div>
-                    <div class="persona-actions">
-                      <button (click)="editPersona(persona); $event.stopPropagation()" class="action-btn">✏️</button>
-                      <button (click)="deletePersona(persona.id); $event.stopPropagation()" class="action-btn danger">🗑️</button>
-                    </div>
-                  </div>
-                }
-                @if (getCustomPersonas().length === 0) {
-                  <div class="empty-state">暂无自定義人設，点击上方按鈕创建</div>
-                }
-              </div>
-            </div>
-          }
-        </div>
-
-        <div class="modal-footer">
-          <button (click)="closePersonaManager()" class="btn-cancel">取消</button>
-          @if (selectedPersonaId()) {
-            <button (click)="applySelectedPersona()" class="btn-save">
-              ✓ 使用「{{ getPersonaById(selectedPersonaId()!)?.name }}」
-            </button>
-          }
-        </div>
-      </div>
-    }
-
-    <!-- AI 人設编辑弹窗 -->
-    @if (showPersonaEditor()) {
-      <div class="modal-overlay" (click)="closePersonaEditor()"></div>
-      <div class="modal-container persona-editor-modal">
-        <div class="modal-header">
-          <h3>{{ editingPersona()?.id ? '✏️ 编辑人設' : '➕ 创建人設' }}</h3>
-          <button (click)="closePersonaEditor()" class="close-btn">×</button>
-        </div>
-        
-        <div class="modal-content">
-          <div class="persona-form">
-            <div class="form-row">
-              <div class="form-group" style="flex: 0 0 80px">
-                <label>图标</label>
-                <input type="text" [(ngModel)]="personaForm.icon" class="icon-input" maxlength="2">
-              </div>
-              <div class="form-group flex-2">
-                <label>人設名稱</label>
-                <input type="text" [(ngModel)]="personaForm.name" placeholder="例如：专业銷售">
-              </div>
-            </div>
-
-            <div class="form-group">
-              <label>简短描述</label>
-              <input type="text" [(ngModel)]="personaForm.description" placeholder="一句話描述这个人設的特點">
-            </div>
-
-            <div class="form-group">
-              <label>系統提示詞 (System Prompt)</label>
-              <textarea 
-                [(ngModel)]="personaForm.systemPrompt" 
-                placeholder="描述 AI 的角色、性格、目標和行為準則..."
-                rows="6"></textarea>
-              <p class="form-hint">這是 AI 的「性格说明书」，决定了 AI 如何回应用戶</p>
-            </div>
-
-            <div class="form-group">
-              <label>開場白（可選）</label>
-              <input type="text" [(ngModel)]="personaForm.greeting" placeholder="AI 主動發起对话時的第一句話">
-            </div>
-
-            <div class="form-row">
-              <div class="form-group">
-                <label>創造力 {{ personaForm.creativity }}%</label>
-                <input type="range" [(ngModel)]="personaForm.creativity" min="0" max="100" step="5">
-                <p class="form-hint">越高越有創意，越低越穩定</p>
-              </div>
-              <div class="form-group">
-                <label>回复長度</label>
-                <select [(ngModel)]="personaForm.responseLength">
-                  <option value="short">简短</option>
-                  <option value="medium">適中</option>
-                  <option value="long">详细</option>
-                </select>
-              </div>
-            </div>
-
-            <div class="form-row">
-              <div class="form-group">
-                <label>語氣风格</label>
-                <select [(ngModel)]="personaForm.tone">
-                  <option value="formal">正式</option>
-                  <option value="professional">专业</option>
-                  <option value="friendly">友善</option>
-                  <option value="casual">輕鬆</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label>语言</label>
-                <select [(ngModel)]="personaForm.language">
-                  <option value="zh-TW">繁体中文</option>
-                  <option value="zh-CN">簡體中文</option>
-                  <option value="en">English</option>
-                  <option value="ja">日本語</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label class="checkbox-label">
-                  <input type="checkbox" [(ngModel)]="personaForm.enableEmoji">
-                  <span>使用表情符号</span>
-                </label>
-              </div>
-            </div>
-
-            <div class="form-group">
-              <label>屏蔽关鍵詞（一行一個）</label>
-              <textarea 
-                [(ngModel)]="personaForm.blockKeywordsText" 
-                placeholder="包含這些关鍵詞的消息不自动回复"
-                rows="3"></textarea>
-            </div>
-          </div>
-        </div>
-
-        <div class="modal-footer">
-          <button (click)="closePersonaEditor()" class="btn-cancel">取消</button>
-          <button (click)="savePersona()" class="btn-save" [disabled]="!personaForm.name || !personaForm.systemPrompt">
-            💾 保存人設
-          </button>
-        </div>
-      </div>
-    }
+    <!-- AI 人設管理（拆分後的子組件：管理+編輯雙彈窗） -->
+    <app-persona-manager
+      [visible]="showPersonaManager()"
+      [initialPersonaId]="personaInitialId()"
+      (closed)="closePersonaManager()"
+      (applied)="onPersonaApplied($event)">
+    </app-persona-manager>
 
     <!-- 角色選擇器彈出框 -->
     @if (showRoleSelector()) {
@@ -2748,8 +2382,7 @@ export const PROXY_TYPES = [
       text-align: center;
       line-height: 1.5;
     }
-
-    .login-success-icon, .login-error-icon {
+`, `    .login-success-icon, .login-error-icon {
       font-size: 2.5rem;
     }
 
@@ -3445,8 +3078,7 @@ export const PROXY_TYPES = [
       flex-direction: column;
       box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
     }
-
-    .modal-header {
+`, `    .modal-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -4208,8 +3840,7 @@ export const PROXY_TYPES = [
     .detail-item.full-width {
       grid-column: 1 / -1;
     }
-
-    .detail-tags {
+`, `    .detail-tags {
       display: flex;
       flex-wrap: wrap;
       gap: 0.375rem;
@@ -4222,124 +3853,6 @@ export const PROXY_TYPES = [
     }
 
     /* AI 人設管理 */
-    .persona-manager-modal {
-      width: 720px;
-      max-height: 85vh;
-    }
-
-    .persona-editor-modal {
-      width: 600px;
-      max-height: 90vh;
-    }
-
-    .persona-tabs {
-      display: flex;
-      gap: 0.5rem;
-      padding: 1rem 1.5rem;
-      border-bottom: 1px solid var(--border-default, rgba(148, 163, 184, 0.1));
-    }
-
-    .persona-tabs button {
-      padding: 0.5rem 1rem;
-      background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));
-      border: 1px solid var(--border-default, rgba(148, 163, 184, 0.2));
-      border-radius: 0.5rem;
-      color: var(--text-secondary);
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-
-    .persona-tabs button:hover {
-      border-color: var(--primary);
-    }
-
-    .persona-tabs button.active {
-      background: linear-gradient(135deg, rgba(6, 182, 212, 0.2), rgba(59, 130, 246, 0.2));
-      border-color: var(--primary);
-      color: var(--primary);
-    }
-
-    .persona-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 0.75rem;
-      padding: 1rem 1.5rem;
-      max-height: 400px;
-      overflow-y: auto;
-    }
-
-    .persona-card {
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-      padding: 1rem;
-      background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));
-      border: 2px solid transparent;
-      border-radius: 0.75rem;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-
-    .persona-card:hover {
-      border-color: var(--border-default, rgba(148, 163, 184, 0.3));
-    }
-
-    .persona-card.selected {
-      border-color: var(--primary);
-      background: rgba(6, 182, 212, 0.1);
-    }
-
-    .persona-card.horizontal {
-      flex-direction: row;
-      align-items: center;
-    }
-
-    .persona-icon {
-      font-size: 2rem;
-      width: 48px;
-      height: 48px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: var(--bg-card, rgba(30, 41, 59, 0.5));
-      border-radius: 0.5rem;
-    }
-
-    .persona-info {
-      flex: 1;
-    }
-
-    .persona-name {
-      font-size: 0.875rem;
-      font-weight: 600;
-      color: var(--text-primary);
-      margin-bottom: 0.25rem;
-    }
-
-    .persona-desc {
-      font-size: 0.75rem;
-      color: var(--text-secondary);
-      line-height: 1.4;
-    }
-
-    .persona-meta {
-      display: flex;
-      gap: 0.5rem;
-      flex-wrap: wrap;
-    }
-
-    .meta-tag {
-      padding: 0.125rem 0.375rem;
-      background: var(--bg-card, rgba(30, 41, 59, 0.5));
-      border-radius: 0.25rem;
-      font-size: 0.625rem;
-      color: var(--text-secondary);
-    }
-
-    .persona-actions {
-      display: flex;
-      gap: 0.25rem;
-    }
 
     .action-btn {
       padding: 0.375rem 0.5rem;
@@ -4359,46 +3872,6 @@ export const PROXY_TYPES = [
     .action-btn.danger:hover {
       border-color: #ef4444;
       color: #ef4444;
-    }
-
-    .custom-persona-section {
-      padding: 1rem 1.5rem;
-    }
-
-    .btn-new-persona {
-      width: 100%;
-      padding: 0.75rem;
-      background: linear-gradient(135deg, rgba(6, 182, 212, 0.2), rgba(59, 130, 246, 0.2));
-      border: 1px dashed var(--primary);
-      border-radius: 0.5rem;
-      color: var(--primary);
-      cursor: pointer;
-      font-size: 0.875rem;
-      margin-bottom: 1rem;
-    }
-
-    .btn-new-persona:hover {
-      background: linear-gradient(135deg, rgba(6, 182, 212, 0.3), rgba(59, 130, 246, 0.3));
-    }
-
-    .custom-persona-list {
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-      max-height: 300px;
-      overflow-y: auto;
-    }
-
-    .persona-form {
-      padding: 1rem 1.5rem;
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
-    }
-
-    .icon-input {
-      text-align: center;
-      font-size: 1.5rem !important;
     }
 
     /* 人設选择 */
@@ -4464,6 +3937,7 @@ export class AccountCardListComponent implements OnInit, OnChanges, OnDestroy {
   private ipcService = inject(ElectronIpcService);
   private toast = inject(ToastService);
   private i18n = inject(I18nService);
+  personaService = inject(PersonaService);
   private ipcChannels: string[] = [];
   
   // 翻譯輔助方法
@@ -4558,23 +4032,19 @@ export class AccountCardListComponent implements OnInit, OnChanges, OnDestroy {
   newGroupName = '';
   newGroupColor = '#6b7280';
 
-  // AI 人設状态
+  // AI 人設（管理/編輯 UI 已拆至 PersonaManagerComponent，數據走 PersonaService）
   showPersonaManager = signal(false);
-  showPersonaEditor = signal(false);
-  personaTab = signal<'templates' | 'custom'>('templates');
-  selectedPersonaId = signal<string | null>(null);
-  editingPersona = signal<AIPersona | null>(null);
-  availablePersonas = signal<AIPersona[]>([...DEFAULT_AI_PERSONAS]);
-  applyPersonaToAccount = signal<Account | null>(null);
+  /** 打開人設庫時的預選 ID */
+  personaInitialId = signal<string | null>(null);
+  /** 「使用人設」的寫入目標：直接應用到帳號 or 回填編輯表單 */
+  private personaApplyTarget: 'account' | 'editForm' = 'account';
+  private personaTargetAccount: Account | null = null;
 
   // 角色選擇器状态
   showRoleSelector = signal(false);
   roleSelectorAccount = signal<Account | null>(null);
   roleSelectorPosition = signal<{ top: number; left: number }>({ top: 0, left: 0 });
   assignableRoles = getAssignableRoles();
-
-  // 人設编辑表單
-  personaForm = this.getDefaultPersonaForm();
 
   // 批量编辑表單
   batchForm: {
@@ -4683,7 +4153,7 @@ export class AccountCardListComponent implements OnInit, OnChanges, OnDestroy {
 
   ngOnInit(): void {
     this.loadTagsAndGroups();
-    this.loadPersonas();
+    this.personaService.load();
     this.setupLoginStatusListeners();
   }
 
@@ -5405,197 +4875,58 @@ export class AccountCardListComponent implements OnInit, OnChanges, OnDestroy {
     }, 30000);
   }
 
-  // ========== AI 人設功能 ==========
+  // ========== AI 人設（UI 拆至 PersonaManagerComponent，數據走 PersonaService） ==========
 
-  getDefaultPersonaForm() {
-    return {
-      id: '',
-      name: '',
-      icon: '🤖',
-      description: '',
-      systemPrompt: '',
-      greeting: '',
-      creativity: 50,
-      responseLength: 'medium' as 'short' | 'medium' | 'long',
-      tone: 'friendly' as 'formal' | 'casual' | 'friendly' | 'professional',
-      language: 'zh-TW',
-      enableEmoji: true,
-      blockKeywordsText: ''
-    };
+  /** 從帳號卡片/詳情打開人設庫：選定後直接應用到該帳號 */
+  openPersonaManager(account?: Account): void {
+    this.personaApplyTarget = 'account';
+    this.personaTargetAccount = account ?? null;
+    this.personaInitialId.set(account?.aiPersonality || null);
+    this.showPersonaManager.set(true);
   }
 
-  openPersonaManager(account?: Account): void {
-    if (account) {
-      this.applyPersonaToAccount.set(account);
-      // 如果账号已有人設，選中它
-      if (account.aiPersonality) {
-        this.selectedPersonaId.set(account.aiPersonality);
-      }
-    }
+  /** 從編輯彈窗打開人設庫：選定後回填編輯表單（取代原方法猴子補丁） */
+  openPersonaManagerFromEdit(): void {
+    this.personaApplyTarget = 'editForm';
+    this.personaTargetAccount = null;
+    this.personaInitialId.set(this.editForm.aiPersonality || null);
     this.showPersonaManager.set(true);
   }
 
   closePersonaManager(): void {
     this.showPersonaManager.set(false);
-    this.selectedPersonaId.set(null);
-    this.applyPersonaToAccount.set(null);
+    this.personaInitialId.set(null);
+    this.personaTargetAccount = null;
   }
 
-  selectPersona(persona: AIPersona): void {
-    this.selectedPersonaId.set(persona.id);
-  }
-
-  getPersonaById(id: string): AIPersona | undefined {
-    return this.availablePersonas().find(p => p.id === id);
-  }
-
-  getCustomPersonas(): AIPersona[] {
-    return this.availablePersonas().filter(p => p.isCustom);
-  }
-
-  getToneName(tone: string): string {
-    const toneMap: Record<string, string> = {
-      'formal': '正式',
-      'professional': '专业',
-      'friendly': '友善',
-      'casual': '輕鬆'
-    };
-    return toneMap[tone] || tone;
-  }
-
-  applySelectedPersona(): void {
-    const personaId = this.selectedPersonaId();
-    const account = this.applyPersonaToAccount();
-    
-    if (personaId && account) {
-      // 更新账号的 AI 人設
-      this.ipcService.send('update-account', {
-        id: account.id,
-        phone: account.phone,
-        aiPersonality: personaId,
-        aiEnabled: true
-      });
-      
-      account.aiPersonality = personaId;
-      account.aiEnabled = true;
-      
-      this.toast.success(`已应用人設「${this.getPersonaById(personaId)?.name}」`);
-      this.closePersonaManager();
-    }
-  }
-
-  startNewPersona(): void {
-    this.personaForm = this.getDefaultPersonaForm();
-    this.editingPersona.set(null);
-    this.showPersonaEditor.set(true);
-  }
-
-  editPersona(persona: AIPersona): void {
-    this.personaForm = {
-      id: persona.id,
-      name: persona.name,
-      icon: persona.icon,
-      description: persona.description,
-      systemPrompt: persona.systemPrompt,
-      greeting: persona.greeting || '',
-      creativity: persona.creativity,
-      responseLength: persona.responseLength,
-      tone: persona.tone,
-      language: persona.language,
-      enableEmoji: persona.enableEmoji,
-      blockKeywordsText: persona.blockKeywords.join('\n')
-    };
-    this.editingPersona.set(persona);
-    this.showPersonaEditor.set(true);
-  }
-
-  closePersonaEditor(): void {
-    this.showPersonaEditor.set(false);
-    this.editingPersona.set(null);
-    this.personaForm = this.getDefaultPersonaForm();
-  }
-
-  savePersona(): void {
-    const newPersona: AIPersona = {
-      id: this.personaForm.id || 'custom_' + Date.now(),
-      name: this.personaForm.name,
-      icon: this.personaForm.icon || '🤖',
-      description: this.personaForm.description,
-      systemPrompt: this.personaForm.systemPrompt,
-      greeting: this.personaForm.greeting,
-      creativity: this.personaForm.creativity,
-      responseLength: this.personaForm.responseLength,
-      tone: this.personaForm.tone,
-      language: this.personaForm.language,
-      enableEmoji: this.personaForm.enableEmoji,
-      blockKeywords: this.personaForm.blockKeywordsText.split('\n').filter(k => k.trim()),
-      isCustom: true
-    };
-
-    if (this.editingPersona()) {
-      // 更新現有人設
-      this.availablePersonas.update(personas => 
-        personas.map(p => p.id === newPersona.id ? newPersona : p)
-      );
-      this.toast.success('人設已更新');
+  /** 子組件「使用人設」回調：按打開來源分流寫入 */
+  onPersonaApplied(personaId: string): void {
+    const persona = this.personaService.getById(personaId);
+    if (this.personaApplyTarget === 'editForm') {
+      this.editForm.aiPersonality = personaId;
+      if (persona) {
+        this.editForm.aiCreativity = persona.creativity;
+      }
     } else {
-      // 添加新人設
-      this.availablePersonas.update(personas => [...personas, newPersona]);
-      this.toast.success('人設已创建');
-    }
-
-    // 保存到後端
-    this.savePersonasToBackend();
-    this.closePersonaEditor();
-  }
-
-  deletePersona(personaId: string): void {
-    if (confirm('确定要删除这个人設嗎？')) {
-      this.availablePersonas.update(personas => 
-        personas.filter(p => p.id !== personaId)
-      );
-      this.savePersonasToBackend();
-      this.toast.success('人設已删除');
-    }
-  }
-
-  savePersonasToBackend(): void {
-    // 只保存自定義人設
-    const customPersonas = this.getCustomPersonas();
-    this.ipcService.send('save-personas', { personas: customPersonas });
-  }
-
-  openPersonaManagerFromEdit(): void {
-    // 从编辑弹窗打开人設选择
-    this.selectedPersonaId.set(this.editForm.aiPersonality || null);
-    this.showPersonaManager.set(true);
-    
-    // 监听选择結果
-    const originalApply = this.applySelectedPersona.bind(this);
-    this.applySelectedPersona = () => {
-      const personaId = this.selectedPersonaId();
-      if (personaId) {
-        this.editForm.aiPersonality = personaId;
-        // 同步人設设置到表單
-        const persona = this.getPersonaById(personaId);
-        if (persona) {
-          this.editForm.aiCreativity = persona.creativity;
-        }
+      const account = this.personaTargetAccount;
+      if (account) {
+        this.ipcService.send('update-account', {
+          id: account.id,
+          phone: account.phone,
+          aiPersonality: personaId,
+          aiEnabled: true
+        });
+        account.aiPersonality = personaId;
+        account.aiEnabled = true;
+        this.toast.success(`已应用人設「${persona?.name}」`);
       }
-      this.closePersonaManager();
-      this.applySelectedPersona = originalApply;
-    };
+    }
+    this.closePersonaManager();
   }
 
-  loadPersonas(): void {
-    this.ipcService.once('get-personas-result', (result: any) => {
-      if (result.success && result.personas) {
-        // 合併预设和自定義人設
-        const customPersonas = result.personas.map((p: any) => ({ ...p, isCustom: true }));
-        this.availablePersonas.set([...DEFAULT_AI_PERSONAS, ...customPersonas]);
-      }
-    });
-    this.ipcService.send('get-personas', {});
+  /** 模板顯示當前人設名用（編輯彈窗 AI 設置面板） */
+  getPersonaById(id: string): AIPersona | undefined {
+    return this.personaService.getById(id);
   }
 
   // ========== 标签和分組功能 ==========

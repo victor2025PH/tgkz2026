@@ -18,6 +18,8 @@ import {
   SchedulerService,
   AnimationConfigService
 } from '../services';
+import { OnboardingService } from '../services/onboarding.service';
+import { ToastService } from '../toast.service';
 
 export type SettingsTab = 'appearance' | 'notifications' | 'help' | 'backup' | 'scheduler' | 'about';
 
@@ -162,6 +164,10 @@ export type SettingsTab = 'appearance' | 'notifications' | 'help' | 'backup' | '
             <button (click)="openOnboarding()"
                     class="px-4 py-2.5 bg-gradient-to-r from-cyan-500/20 to-blue-500/20 hover:from-cyan-500/30 hover:to-blue-500/30 border border-cyan-500/40 text-cyan-400 rounded-xl transition-all text-sm font-medium">
               {{ t('settings.openOnboarding') }}
+            </button>
+            <button (click)="replayPageTours()"
+                    class="px-4 py-2.5 bg-gradient-to-r from-purple-500/20 to-pink-500/20 hover:from-purple-500/30 hover:to-pink-500/30 border border-purple-500/40 text-purple-400 rounded-xl transition-all text-sm font-medium">
+              重看頁面導覽
             </button>
           </div>
         </div>
@@ -370,6 +376,8 @@ export class SettingsViewComponent implements OnInit, OnDestroy {
   public backup = inject(BackupService);
   public scheduler = inject(SchedulerService);
   public animationConfig = inject(AnimationConfigService);
+  private onboardingTours = inject(OnboardingService);
+  private toast = inject(ToastService);
 
   activeTab = signal<SettingsTab>('appearance');
   supportedLocales = SUPPORTED_LOCALES;
@@ -407,6 +415,12 @@ export class SettingsViewComponent implements OnInit, OnDestroy {
 
   openOnboarding(): void {
     window.dispatchEvent(new CustomEvent('tg-open-onboarding'));
+  }
+
+  /** 重置頁面 spotlight 導覽進度，下次進入關鍵頁重新播放 */
+  replayPageTours(): void {
+    this.onboardingTours.resetAll();
+    this.toast.success('頁面導覽已重置，進入監控中心即可重看');
   }
   
   // 翻譯方法

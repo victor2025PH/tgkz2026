@@ -1990,7 +1990,7 @@ export const PROXY_TYPES = [
       flex: 1;
       background: transparent;
       border: none;
-      color: var(--text-primary, white);
+      color: var(--text-primary);
       font-size: 0.875rem;
       outline: none;
     }
@@ -2000,7 +2000,7 @@ export const PROXY_TYPES = [
       background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));
       border: 1px solid var(--border-default, rgba(148, 163, 184, 0.2));
       border-radius: 0.5rem;
-      color: var(--text-primary, white);
+      color: var(--text-primary);
       font-size: 0.875rem;
     }
 
@@ -2021,13 +2021,13 @@ export const PROXY_TYPES = [
       padding: 0.5rem 0.75rem;
       background: transparent;
       border: none;
-      color: var(--text-muted, #94a3b8);
+      color: var(--text-muted);
       cursor: pointer;
       transition: all 0.2s;
     }
 
     .toggle-btn.active {
-      background: var(--primary, #06b6d4);
+      background: var(--primary);
       color: white;
     }
 
@@ -2084,12 +2084,12 @@ export const PROXY_TYPES = [
     .batch-checkbox input {
       width: 16px;
       height: 16px;
-      accent-color: var(--primary, #06b6d4);
+      accent-color: var(--primary);
     }
 
     .checkbox-label {
       font-size: 0.875rem;
-      color: var(--text-secondary, #cbd5e1);
+      color: var(--text-secondary);
     }
 
     .batch-actions {
@@ -2100,7 +2100,7 @@ export const PROXY_TYPES = [
 
     .batch-count {
       font-size: 0.875rem;
-      color: var(--primary, #06b6d4);
+      color: var(--primary);
       font-weight: 500;
       margin-right: 0.5rem;
     }
@@ -2110,15 +2110,15 @@ export const PROXY_TYPES = [
       background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));
       border: 1px solid var(--border-default, rgba(148, 163, 184, 0.2));
       border-radius: 0.375rem;
-      color: var(--text-secondary, #cbd5e1);
+      color: var(--text-secondary);
       font-size: 0.75rem;
       cursor: pointer;
       transition: all 0.2s;
     }
 
     .batch-btn:hover:not(:disabled) {
-      border-color: var(--primary, #06b6d4);
-      color: var(--primary, #06b6d4);
+      border-color: var(--primary);
+      color: var(--primary);
     }
 
     .batch-btn.primary {
@@ -2178,12 +2178,12 @@ export const PROXY_TYPES = [
 
     .stat-label {
       font-size: 0.75rem;
-      color: var(--text-muted, #94a3b8);
+      color: var(--text-muted);
     }
 
     .stat-value {
       font-weight: 600;
-      color: var(--text-primary, white);
+      color: var(--text-primary);
     }
 
     /* Card Grid */
@@ -2208,7 +2208,7 @@ export const PROXY_TYPES = [
     }
 
     .account-card.selected {
-      border-color: var(--primary, #06b6d4);
+      border-color: var(--primary);
       background: rgba(6, 182, 212, 0.1);
     }
 
@@ -2222,12 +2222,12 @@ export const PROXY_TYPES = [
     .card-select input {
       width: 18px;
       height: 18px;
-      accent-color: var(--primary, #06b6d4);
+      accent-color: var(--primary);
       cursor: pointer;
     }
 
     .account-card:hover {
-      border-color: var(--primary, #06b6d4);
+      border-color: var(--primary);
       transform: translateY(-2px);
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
     }
@@ -2290,7 +2290,7 @@ export const PROXY_TYPES = [
 
     .card-nickname {
       font-size: 0.75rem;
-      color: var(--primary, #06b6d4);
+      color: var(--primary);
       font-weight: 500;
       margin-bottom: 0.125rem;
     }
@@ -2334,7 +2334,7 @@ export const PROXY_TYPES = [
 
     .role-arrow {
       font-size: 0.625rem;
-      color: var(--text-muted, #94a3b8);
+      color: var(--text-muted);
       margin-left: auto;
     }
 
@@ -2352,7 +2352,7 @@ export const PROXY_TYPES = [
     .role-selector-popup {
       position: fixed;
       width: 260px;
-      background: var(--bg-card, #1e293b);
+      background: var(--bg-card);
       border: 1px solid var(--border-default, rgba(148, 163, 184, 0.2));
       border-radius: 0.75rem;
       box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
@@ -2371,12 +2371,12 @@ export const PROXY_TYPES = [
     .role-selector-title {
       font-weight: 600;
       font-size: 0.875rem;
-      color: var(--text-primary, white);
+      color: var(--text-primary);
     }
 
     .role-selector-phone {
       font-size: 0.75rem;
-      color: var(--text-muted, #94a3b8);
+      color: var(--text-muted);
     }
 
     .role-selector-list {
@@ -2421,13 +2421,13 @@ export const PROXY_TYPES = [
       display: block;
       font-weight: 500;
       font-size: 0.875rem;
-      color: var(--text-primary, white);
+      color: var(--text-primary);
     }
 
     .role-option-desc {
       display: block;
       font-size: 0.75rem;
-      color: var(--text-muted, #94a3b8);
+      color: var(--text-muted);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -2450,13 +2450,13 @@ export const PROXY_TYPES = [
       background: transparent;
       border: 1px solid var(--border-default, rgba(148, 163, 184, 0.2));
       border-radius: 0.375rem;
-      color: var(--text-secondary, #94a3b8);
+      color: var(--text-secondary);
       cursor: pointer;
       font-size: 0.75rem;
     }
 
     .role-selector-cancel:hover {
-      border-color: var(--text-muted, #94a3b8);
+      border-color: var(--text-muted);
     }
 
     .status-dot {
@@ -2517,7 +2517,7 @@ export const PROXY_TYPES = [
 
     .status-text {
       font-size: 0.75rem;
-      color: var(--text-muted, #94a3b8);
+      color: var(--text-muted);
     }
 
     .card-main {
@@ -2527,16 +2527,16 @@ export const PROXY_TYPES = [
     .card-phone {
       font-size: 1.125rem;
       font-weight: 600;
-      color: var(--text-primary, white);
+      color: var(--text-primary);
     }
 
     .card-name {
       font-size: 0.875rem;
-      color: var(--text-secondary, #cbd5e1);
+      color: var(--text-secondary);
     }
 
     .card-username {
-      color: var(--primary, #06b6d4);
+      color: var(--primary);
     }
 
     .card-device {
@@ -2544,7 +2544,7 @@ export const PROXY_TYPES = [
       align-items: center;
       gap: 0.5rem;
       font-size: 0.75rem;
-      color: var(--text-muted, #94a3b8);
+      color: var(--text-muted);
     }
 
     .device-icon { font-size: 1rem; }
@@ -2578,7 +2578,7 @@ export const PROXY_TYPES = [
 
     .health-text {
       font-size: 0.75rem;
-      color: var(--text-muted, #94a3b8);
+      color: var(--text-muted);
       min-width: 35px;
     }
 
@@ -2777,7 +2777,7 @@ export const PROXY_TYPES = [
       background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));
       border: 1px solid var(--border-default, rgba(148, 163, 184, 0.2));
       border-radius: 0.5rem;
-      color: var(--text-primary, white);
+      color: var(--text-primary);
       font-size: 1.5rem;
       letter-spacing: 0.5rem;
       text-align: center;
@@ -2785,7 +2785,7 @@ export const PROXY_TYPES = [
       outline: none;
     }
     .code-input-large:focus {
-      border-color: var(--primary, #06b6d4);
+      border-color: var(--primary);
       box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.15);
     }
 
@@ -2814,7 +2814,7 @@ export const PROXY_TYPES = [
       display: block;
       margin-top: 0.375rem;
       font-size: 0.75rem;
-      color: var(--text-muted, #64748b);
+      color: var(--text-muted);
     }
 
     /* P1-4: 批量登入結果彈窗 */
@@ -2978,23 +2978,9 @@ export const PROXY_TYPES = [
     }
 
     /* Add Card */
-    .add-card {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      border: 2px dashed var(--border-default, rgba(148, 163, 184, 0.3));
-      background: transparent;
-      min-height: 180px;
-    }
-
-    .add-card:hover {
-      border-color: var(--primary, #06b6d4);
-      background: rgba(6, 182, 212, 0.05);
-    }
 
     .add-icon { font-size: 2rem; margin-bottom: 0.5rem; }
-    .add-text { color: var(--text-muted, #94a3b8); }
+    .add-text { color: var(--text-muted); }
 
     /* Table View */
     .table-container {
@@ -3014,7 +3000,7 @@ export const PROXY_TYPES = [
       text-align: left;
       font-size: 0.75rem;
       font-weight: 600;
-      color: var(--text-muted, #94a3b8);
+      color: var(--text-muted);
       text-transform: uppercase;
       background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));
     }
@@ -3022,7 +3008,7 @@ export const PROXY_TYPES = [
     .account-table td {
       padding: 0.75rem 1rem;
       border-top: 1px solid var(--border-default, rgba(148, 163, 184, 0.1));
-      color: var(--text-secondary, #cbd5e1);
+      color: var(--text-secondary);
       font-size: 0.875rem;
     }
 
@@ -3036,7 +3022,7 @@ export const PROXY_TYPES = [
 
     .phone-cell {
       font-weight: 500;
-      color: var(--text-primary, white);
+      color: var(--text-primary);
     }
 
     .device-cell {
@@ -3101,12 +3087,12 @@ export const PROXY_TYPES = [
 
     .empty-state h3 {
       margin: 0 0 0.5rem 0;
-      color: var(--text-primary, white);
+      color: var(--text-primary);
     }
 
     .empty-state p {
       margin: 0 0 1.5rem 0;
-      color: var(--text-muted, #94a3b8);
+      color: var(--text-muted);
     }
 
     /* Detail Panel */
@@ -3147,13 +3133,13 @@ export const PROXY_TYPES = [
 
     .detail-header h3 {
       margin: 0;
-      color: var(--text-primary, white);
+      color: var(--text-primary);
     }
 
     .close-btn {
       background: none;
       border: none;
-      color: var(--text-muted, #94a3b8);
+      color: var(--text-muted);
       font-size: 1.5rem;
       cursor: pointer;
     }
@@ -3192,12 +3178,12 @@ export const PROXY_TYPES = [
       border-radius: 50%;
       object-fit: cover;
       margin: 0 auto 0.75rem;
-      border: 3px solid var(--primary, #06b6d4);
+      border: 3px solid var(--primary);
     }
 
     .detail-nickname {
       font-size: 0.875rem;
-      color: var(--primary, #06b6d4);
+      color: var(--primary);
       font-weight: 500;
       margin-bottom: 0.25rem;
     }
@@ -3208,7 +3194,7 @@ export const PROXY_TYPES = [
       background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));
       border-radius: 0.5rem;
       font-size: 0.875rem;
-      color: var(--text-secondary, #cbd5e1);
+      color: var(--text-secondary);
       font-style: italic;
       text-align: left;
     }
@@ -3216,15 +3202,15 @@ export const PROXY_TYPES = [
     .detail-name {
       font-size: 1.25rem;
       font-weight: 600;
-      color: var(--text-primary, white);
+      color: var(--text-primary);
     }
 
     .detail-phone {
-      color: var(--text-secondary, #cbd5e1);
+      color: var(--text-secondary);
     }
 
     .detail-username {
-      color: var(--primary, #06b6d4);
+      color: var(--primary);
       font-size: 0.875rem;
     }
 
@@ -3262,7 +3248,7 @@ export const PROXY_TYPES = [
 
     .role-change-hint {
       font-size: 0.625rem;
-      color: var(--text-muted, #94a3b8);
+      color: var(--text-muted);
       margin-left: 0.25rem;
     }
 
@@ -3297,7 +3283,7 @@ export const PROXY_TYPES = [
     .detail-section h4 {
       margin: 0 0 0.75rem 0;
       font-size: 0.875rem;
-      color: var(--text-muted, #94a3b8);
+      color: var(--text-muted);
     }
 
     .detail-grid {
@@ -3318,25 +3304,17 @@ export const PROXY_TYPES = [
 
     .detail-item .label {
       font-size: 0.75rem;
-      color: var(--text-muted, #94a3b8);
+      color: var(--text-muted);
     }
 
     .detail-item .value {
       font-size: 0.875rem;
-      color: var(--text-primary, white);
+      color: var(--text-primary);
     }
 
     .detail-item .value.status.online { color: #22c55e; }
     .detail-item .value.status.offline { color: #94a3b8; }
     .detail-item .value.status.banned { color: #ef4444; }
-
-    .detail-actions {
-      padding: 1rem 1.5rem;
-      border-top: 1px solid var(--border-default, rgba(148, 163, 184, 0.1));
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-    }
 
     .detail-actions-grid {
       padding: 0.75rem 1rem;
@@ -3351,7 +3329,7 @@ export const PROXY_TYPES = [
       background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));
       border: 1px solid var(--border-default, rgba(148, 163, 184, 0.2));
       border-radius: 0.375rem;
-      color: var(--text-secondary, #cbd5e1);
+      color: var(--text-secondary);
       font-size: 0.75rem;
       cursor: pointer;
       transition: all 0.2s;
@@ -3359,8 +3337,8 @@ export const PROXY_TYPES = [
     }
 
     .action-btn-sm:hover:not(:disabled) {
-      border-color: var(--primary, #06b6d4);
-      color: var(--primary, #06b6d4);
+      border-color: var(--primary);
+      color: var(--primary);
     }
 
     .action-btn-sm:disabled {
@@ -3391,15 +3369,6 @@ export const PROXY_TYPES = [
       border-color: #ef4444;
     }
 
-    .detail-btn {
-      padding: 0.75rem;
-      border: none;
-      border-radius: 0.5rem;
-      font-weight: 500;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-
     .detail-btn.primary {
       background: linear-gradient(135deg, #22c55e, #16a34a);
       color: white;
@@ -3407,7 +3376,7 @@ export const PROXY_TYPES = [
 
     .detail-btn.secondary {
       background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));
-      color: var(--text-secondary, #cbd5e1);
+      color: var(--text-secondary);
       border: 1px solid var(--border-default, rgba(148, 163, 184, 0.2));
     }
 
@@ -3419,10 +3388,6 @@ export const PROXY_TYPES = [
     .detail-btn.danger {
       background: rgba(239, 68, 68, 0.2);
       color: #fca5a5;
-    }
-
-    .detail-btn:hover {
-      transform: translateY(-1px);
     }
 
     /* Action Button with Labels */
@@ -3443,11 +3408,11 @@ export const PROXY_TYPES = [
     .action-icon { font-size: 1rem; }
     .action-label { 
       font-size: 0.625rem; 
-      color: var(--text-muted, #94a3b8);
+      color: var(--text-muted);
     }
 
     .action-btn:hover .action-label {
-      color: var(--text-primary, white);
+      color: var(--text-primary);
     }
 
     .action-btn.login:hover { background: rgba(34, 197, 94, 0.2); }
@@ -3491,7 +3456,7 @@ export const PROXY_TYPES = [
 
     .modal-header h3 {
       margin: 0;
-      color: var(--text-primary, white);
+      color: var(--text-primary);
       font-size: 1.125rem;
     }
 
@@ -3521,7 +3486,7 @@ export const PROXY_TYPES = [
       padding: 0.75rem 1rem;
       background: none;
       border: none;
-      color: var(--text-muted, #94a3b8);
+      color: var(--text-muted);
       font-size: 0.875rem;
       cursor: pointer;
       white-space: nowrap;
@@ -3530,12 +3495,12 @@ export const PROXY_TYPES = [
     }
 
     .tab-btn:hover {
-      color: var(--text-primary, white);
+      color: var(--text-primary);
     }
 
     .tab-btn.active {
-      color: var(--primary, #06b6d4);
-      border-bottom-color: var(--primary, #06b6d4);
+      color: var(--primary);
+      border-bottom-color: var(--primary);
     }
 
     .tab-panel {
@@ -3551,7 +3516,7 @@ export const PROXY_TYPES = [
       display: block;
       margin-bottom: 0.5rem;
       font-size: 0.875rem;
-      color: var(--text-secondary, #cbd5e1);
+      color: var(--text-secondary);
     }
 
     .form-group input[type="text"],
@@ -3564,7 +3529,7 @@ export const PROXY_TYPES = [
       background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));
       border: 1px solid var(--border-default, rgba(148, 163, 184, 0.2));
       border-radius: 0.5rem;
-      color: var(--text-primary, white);
+      color: var(--text-primary);
       font-size: 0.875rem;
       transition: border-color 0.2s;
     }
@@ -3573,7 +3538,7 @@ export const PROXY_TYPES = [
     .form-group select:focus,
     .form-group textarea:focus {
       outline: none;
-      border-color: var(--primary, #06b6d4);
+      border-color: var(--primary);
     }
 
     .form-row {
@@ -3591,7 +3556,7 @@ export const PROXY_TYPES = [
     .form-hint {
       margin-top: 0.375rem;
       font-size: 0.75rem;
-      color: var(--text-muted, #64748b);
+      color: var(--text-muted);
     }
 
     .form-hint.warning {
@@ -3608,7 +3573,7 @@ export const PROXY_TYPES = [
     .checkbox-label input[type="checkbox"] {
       width: 16px;
       height: 16px;
-      accent-color: var(--primary, #06b6d4);
+      accent-color: var(--primary);
     }
 
     /* Role Grid */
@@ -3630,45 +3595,28 @@ export const PROXY_TYPES = [
     }
 
     .role-card:hover {
-      border-color: var(--primary, #06b6d4);
+      border-color: var(--primary);
       background: rgba(6, 182, 212, 0.1);
     }
 
     .role-card.selected {
-      border-color: var(--primary, #06b6d4);
+      border-color: var(--primary);
       background: rgba(6, 182, 212, 0.2);
     }
 
     .role-name {
       font-size: 0.875rem;
       font-weight: 500;
-      color: var(--text-primary, white);
+      color: var(--text-primary);
       margin-bottom: 0.25rem;
     }
 
     .role-desc {
       font-size: 0.75rem;
-      color: var(--text-muted, #94a3b8);
+      color: var(--text-muted);
     }
 
     /* Slider */
-    .slider-group {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-    }
-
-    .slider-group span {
-      font-size: 0.75rem;
-      color: var(--text-muted, #94a3b8);
-      min-width: 32px;
-    }
-
-    .slider-group input[type="range"] {
-      flex: 1;
-      height: 4px;
-      accent-color: var(--primary, #06b6d4);
-    }
 
     /* Test Button */
     .test-btn {
@@ -3677,15 +3625,15 @@ export const PROXY_TYPES = [
       background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));
       border: 1px solid var(--border-default, rgba(148, 163, 184, 0.2));
       border-radius: 0.5rem;
-      color: var(--text-secondary, #cbd5e1);
+      color: var(--text-secondary);
       cursor: pointer;
       transition: all 0.2s;
       margin-bottom: 0.75rem;
     }
 
     .test-btn:hover:not(:disabled) {
-      border-color: var(--primary, #06b6d4);
-      color: var(--primary, #06b6d4);
+      border-color: var(--primary);
+      color: var(--primary);
     }
 
     .test-btn:disabled {
@@ -3716,7 +3664,7 @@ export const PROXY_TYPES = [
       background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));
       border: 1px solid var(--border-default, rgba(148, 163, 184, 0.2));
       border-radius: 0.5rem;
-      color: var(--text-secondary, #cbd5e1);
+      color: var(--text-secondary);
       cursor: pointer;
       transition: all 0.2s;
     }
@@ -3777,13 +3725,13 @@ export const PROXY_TYPES = [
       background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));
       cursor: pointer;
       font-size: 0.875rem;
-      color: var(--text-primary, white);
+      color: var(--text-primary);
     }
 
     .batch-section-header input {
       width: 16px;
       height: 16px;
-      accent-color: var(--primary, #06b6d4);
+      accent-color: var(--primary);
     }
 
     .batch-section-content {
@@ -3854,7 +3802,7 @@ export const PROXY_TYPES = [
 
     .role-card-desc {
       font-size: 0.75rem;
-      color: var(--text-muted, #94a3b8);
+      color: var(--text-muted);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -3878,17 +3826,17 @@ export const PROXY_TYPES = [
       background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));
       border: 1px solid var(--border-default, rgba(148, 163, 184, 0.2));
       border-radius: 0.375rem;
-      color: var(--text-secondary, #cbd5e1);
+      color: var(--text-secondary);
       font-size: 0.875rem;
       cursor: pointer;
     }
 
     .filter-btn:hover {
-      border-color: var(--primary, #06b6d4);
+      border-color: var(--primary);
     }
 
     .tag-count {
-      background: var(--primary, #06b6d4);
+      background: var(--primary);
       color: white;
       padding: 0.125rem 0.375rem;
       border-radius: 9999px;
@@ -3917,13 +3865,13 @@ export const PROXY_TYPES = [
       border-bottom: 1px solid var(--border-default, rgba(148, 163, 184, 0.1));
       margin-bottom: 0.5rem;
       font-size: 0.75rem;
-      color: var(--text-secondary, #94a3b8);
+      color: var(--text-secondary);
     }
 
     .clear-btn {
       background: none;
       border: none;
-      color: var(--primary, #06b6d4);
+      color: var(--primary);
       cursor: pointer;
       font-size: 0.75rem;
     }
@@ -3954,14 +3902,14 @@ export const PROXY_TYPES = [
       background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));
       border: 1px dashed var(--border-default, rgba(148, 163, 184, 0.3));
       border-radius: 0.375rem;
-      color: var(--text-secondary, #94a3b8);
+      color: var(--text-secondary);
       cursor: pointer;
       font-size: 0.75rem;
     }
 
     .manage-tags-btn:hover {
-      border-color: var(--primary, #06b6d4);
-      color: var(--primary, #06b6d4);
+      border-color: var(--primary);
+      color: var(--primary);
     }
 
     .manage-btn {
@@ -3969,14 +3917,14 @@ export const PROXY_TYPES = [
       background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));
       border: 1px solid var(--border-default, rgba(148, 163, 184, 0.2));
       border-radius: 0.375rem;
-      color: var(--text-secondary, #cbd5e1);
+      color: var(--text-secondary);
       font-size: 0.875rem;
       cursor: pointer;
     }
 
     .manage-btn:hover {
-      border-color: var(--primary, #06b6d4);
-      color: var(--primary, #06b6d4);
+      border-color: var(--primary);
+      color: var(--primary);
     }
 
     /* 卡片标签 */
@@ -4005,7 +3953,7 @@ export const PROXY_TYPES = [
       background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));
       border-radius: 0.25rem;
       font-size: 0.625rem;
-      color: var(--text-secondary, #94a3b8);
+      color: var(--text-secondary);
     }
 
     /* 标签管理弹窗 */
@@ -4027,7 +3975,7 @@ export const PROXY_TYPES = [
       background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));
       border: 1px solid var(--border-default, rgba(148, 163, 184, 0.2));
       border-radius: 0.375rem;
-      color: var(--text-primary, white);
+      color: var(--text-primary);
       font-size: 0.875rem;
     }
 
@@ -4091,7 +4039,7 @@ export const PROXY_TYPES = [
       background: var(--bg-card, rgba(30, 41, 59, 0.5));
       border: 1px solid var(--border-default, rgba(148, 163, 184, 0.2));
       border-radius: 0.25rem;
-      color: var(--text-primary, white);
+      color: var(--text-primary);
       font-size: 0.875rem;
     }
 
@@ -4100,7 +4048,7 @@ export const PROXY_TYPES = [
       background: none;
       border: 1px solid var(--border-default, rgba(148, 163, 184, 0.2));
       border-radius: 0.25rem;
-      color: var(--text-secondary, #94a3b8);
+      color: var(--text-secondary);
       cursor: pointer;
     }
 
@@ -4125,17 +4073,17 @@ export const PROXY_TYPES = [
 
     .group-count {
       font-size: 0.75rem;
-      color: var(--text-secondary, #94a3b8);
+      color: var(--text-secondary);
     }
 
     .empty-state {
       text-align: center;
       padding: 2rem;
-      color: var(--text-secondary, #94a3b8);
+      color: var(--text-secondary);
     }
 
     .empty-state a {
-      color: var(--primary, #06b6d4);
+      color: var(--primary);
       cursor: pointer;
     }
 
@@ -4165,7 +4113,7 @@ export const PROXY_TYPES = [
     }
 
     .account-tag-option.selected {
-      border-color: var(--primary, #06b6d4);
+      border-color: var(--primary);
       background: rgba(6, 182, 212, 0.1);
     }
 
@@ -4192,13 +4140,13 @@ export const PROXY_TYPES = [
       background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));
       border: 1px solid var(--border-default, rgba(148, 163, 184, 0.2));
       border-radius: 0.375rem;
-      color: var(--text-primary, white);
+      color: var(--text-primary);
       font-size: 0.875rem;
     }
 
     .tag-input-inline:focus {
       outline: none;
-      border-color: var(--primary, #06b6d4);
+      border-color: var(--primary);
     }
 
     .color-picker-inline {
@@ -4212,7 +4160,7 @@ export const PROXY_TYPES = [
 
     .btn-quick-add {
       padding: 0.5rem 1rem;
-      background: var(--primary, #06b6d4);
+      background: var(--primary);
       color: white;
       border: none;
       border-radius: 0.375rem;
@@ -4222,7 +4170,7 @@ export const PROXY_TYPES = [
     }
 
     .btn-quick-add:hover:not(:disabled) {
-      background: var(--primary-hover, #0891b2);
+      background: var(--primary-hover);
     }
 
     .btn-quick-add:disabled {
@@ -4233,7 +4181,7 @@ export const PROXY_TYPES = [
     .modal-footer .btn-manage {
       padding: 0.5rem 1rem;
       background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));
-      color: var(--text-secondary, #94a3b8);
+      color: var(--text-secondary);
       border: 1px solid var(--border-default, rgba(148, 163, 184, 0.2));
       border-radius: 0.375rem;
       font-size: 0.875rem;
@@ -4242,7 +4190,7 @@ export const PROXY_TYPES = [
 
     .modal-footer .btn-manage:hover {
       background: var(--bg-secondary, rgba(30, 41, 59, 0.5));
-      color: var(--text-primary, white);
+      color: var(--text-primary);
     }
 
     .modal-footer .footer-actions {
@@ -4269,7 +4217,7 @@ export const PROXY_TYPES = [
     }
 
     .no-tags {
-      color: var(--text-secondary, #94a3b8);
+      color: var(--text-secondary);
       font-size: 0.75rem;
     }
 
@@ -4296,19 +4244,19 @@ export const PROXY_TYPES = [
       background: var(--bg-tertiary, rgba(15, 23, 42, 0.5));
       border: 1px solid var(--border-default, rgba(148, 163, 184, 0.2));
       border-radius: 0.5rem;
-      color: var(--text-secondary, #94a3b8);
+      color: var(--text-secondary);
       cursor: pointer;
       transition: all 0.2s;
     }
 
     .persona-tabs button:hover {
-      border-color: var(--primary, #06b6d4);
+      border-color: var(--primary);
     }
 
     .persona-tabs button.active {
       background: linear-gradient(135deg, rgba(6, 182, 212, 0.2), rgba(59, 130, 246, 0.2));
-      border-color: var(--primary, #06b6d4);
-      color: var(--primary, #06b6d4);
+      border-color: var(--primary);
+      color: var(--primary);
     }
 
     .persona-grid {
@@ -4337,7 +4285,7 @@ export const PROXY_TYPES = [
     }
 
     .persona-card.selected {
-      border-color: var(--primary, #06b6d4);
+      border-color: var(--primary);
       background: rgba(6, 182, 212, 0.1);
     }
 
@@ -4364,13 +4312,13 @@ export const PROXY_TYPES = [
     .persona-name {
       font-size: 0.875rem;
       font-weight: 600;
-      color: var(--text-primary, white);
+      color: var(--text-primary);
       margin-bottom: 0.25rem;
     }
 
     .persona-desc {
       font-size: 0.75rem;
-      color: var(--text-secondary, #94a3b8);
+      color: var(--text-secondary);
       line-height: 1.4;
     }
 
@@ -4385,7 +4333,7 @@ export const PROXY_TYPES = [
       background: var(--bg-card, rgba(30, 41, 59, 0.5));
       border-radius: 0.25rem;
       font-size: 0.625rem;
-      color: var(--text-secondary, #94a3b8);
+      color: var(--text-secondary);
     }
 
     .persona-actions {
@@ -4398,14 +4346,14 @@ export const PROXY_TYPES = [
       background: var(--bg-card, rgba(30, 41, 59, 0.5));
       border: 1px solid var(--border-default, rgba(148, 163, 184, 0.2));
       border-radius: 0.25rem;
-      color: var(--text-secondary, #94a3b8);
+      color: var(--text-secondary);
       cursor: pointer;
       transition: all 0.2s;
     }
 
     .action-btn:hover {
-      border-color: var(--primary, #06b6d4);
-      color: var(--primary, #06b6d4);
+      border-color: var(--primary);
+      color: var(--primary);
     }
 
     .action-btn.danger:hover {
@@ -4421,9 +4369,9 @@ export const PROXY_TYPES = [
       width: 100%;
       padding: 0.75rem;
       background: linear-gradient(135deg, rgba(6, 182, 212, 0.2), rgba(59, 130, 246, 0.2));
-      border: 1px dashed var(--primary, #06b6d4);
+      border: 1px dashed var(--primary);
       border-radius: 0.5rem;
-      color: var(--primary, #06b6d4);
+      color: var(--primary);
       cursor: pointer;
       font-size: 0.875rem;
       margin-bottom: 1rem;
@@ -4473,7 +4421,7 @@ export const PROXY_TYPES = [
     }
 
     .current-persona:hover {
-      border-color: var(--primary, #06b6d4);
+      border-color: var(--primary);
     }
 
     .persona-icon-small {
@@ -4481,27 +4429,27 @@ export const PROXY_TYPES = [
     }
 
     .persona-name-small {
-      color: var(--text-primary, white);
+      color: var(--text-primary);
       font-size: 0.875rem;
     }
 
     .no-persona {
-      color: var(--text-secondary, #94a3b8);
+      color: var(--text-secondary);
       font-size: 0.875rem;
     }
 
     .select-arrow {
       margin-left: auto;
-      color: var(--text-secondary, #94a3b8);
+      color: var(--text-secondary);
       font-size: 0.75rem;
     }
 
     .btn-persona-manager {
       padding: 0.5rem 0.75rem;
       background: linear-gradient(135deg, rgba(6, 182, 212, 0.2), rgba(59, 130, 246, 0.2));
-      border: 1px solid var(--primary, #06b6d4);
+      border: 1px solid var(--primary);
       border-radius: 0.375rem;
-      color: var(--primary, #06b6d4);
+      color: var(--primary);
       cursor: pointer;
       font-size: 0.75rem;
       white-space: nowrap;

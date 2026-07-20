@@ -25,24 +25,8 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="MatrixX">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><defs><linearGradient id='g1' x1='0%25' y1='0%25' x2='100%25' y2='100%25'><stop offset='0%25' stop-color='%230891b2'/><stop offset='100%25' stop-color='%237c3aed'/></linearGradient></defs><path d='M32 8L52 20V44L32 56L12 44V20L32 8Z' fill='url(%23g1)'/><path d='M22 28L40 22L34 36L28 32L22 28Z' fill='white'/><path d='M24 12L28 8L32 11L36 8L40 12L38 16H26L24 12Z' fill='%23fbbf24'/></svg>">
-  <!-- Tailwind CSS - 支援離線/在線雙模式 -->
-  <script>
-    // 嘗試加載 CDN，失敗時使用內置樣式
-    (function() {
-      var script = document.createElement('script');
-      script.src = 'https://cdn.tailwindcss.com?plugins=forms';
-      script.onerror = function() {
-        console.warn('[Tailwind] CDN 不可用，使用內置樣式');
-        // 離線模式：Tailwind 類已預編譯到 CSS 中
-      };
-      script.onload = function() {
-        if (window.tailwind) {
-          window.tailwind.config = { darkMode: 'class' };
-        }
-      };
-      document.head.appendChild(script);
-    })();
-  </script>
+  <!-- Tailwind CSS：構建期編譯（src/styles.css），不再依賴 CDN 運行時 JIT -->
+
   <!-- Library for Excel file handling removed -->
   <style>
     /* ============================================

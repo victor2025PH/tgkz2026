@@ -37,6 +37,12 @@ export type AuditAction =
   | 'settings.profile_update'
   // 導航
   | 'nav.view_change'
+  // 🆕 導覽/獲客漏斗（完成率分析：卡在哪一步、耗時多久）
+  | 'onboarding.tour_started'
+  | 'onboarding.tour_completed'
+  | 'onboarding.tour_skipped'
+  | 'funnel.step_completed'
+  | 'funnel.setup_completed'
   // 數據操作
   | 'data.export'
   | 'data.import'
@@ -143,6 +149,16 @@ export class AuditTrackerService implements OnDestroy {
 
   trackQuotaExceeded(quotaType: string, current: number, limit: number): void {
     this.track('quota.exceeded', { quotaType, current, limit }, 'warning');
+  }
+
+  /** Spotlight 導覽事件（started/completed/skipped 統一入口） */
+  trackTour(event: 'started' | 'completed' | 'skipped', tourId: string, details: Record<string, any> = {}): void {
+    this.track(`onboarding.tour_${event}` as AuditAction, { tourId, ...details });
+  }
+
+  /** 獲客上手漏斗：某一步從未完成→完成（stepId: account/groups/keywords/rules/monitor） */
+  trackFunnelStep(stepId: string, stepIndex: number): void {
+    this.track('funnel.step_completed', { stepId, stepIndex });
   }
 
   /**

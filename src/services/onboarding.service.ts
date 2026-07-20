@@ -13,7 +13,8 @@
  * 已完成/已跳過的 tour 不會重複出現。
  */
 
-import { Injectable, signal, computed } from '@angular/core';
+import { Injectable, signal, computed, inject } from '@angular/core';
+import { AuditTrackerService } from './audit-tracker.service';
 
 // 引導步驟
 export interface OnboardingStep {
@@ -52,7 +53,10 @@ export interface OnboardingProgress {
   providedIn: 'root'
 })
 export class OnboardingService {
-  
+  private audit = inject(AuditTrackerService);
+  /** 當前 tour 開始時間（埋點耗時用） */
+  private tourStartedAt = 0;
+
   // 狀態
   private _isActive = signal(false);
   isActive = this._isActive.asReadonly();
@@ -159,7 +163,9 @@ export class OnboardingService {
     this._currentTour.set(tour);
     this._currentStepIndex.set(0);
     this._isActive.set(true);
-    
+    this.tourStartedAt = Date.now();
+    this.audit.trackTour('started', tour.id, { totalSteps: tour.steps.length });
+
     const step = tour.steps[0];
     step.beforeShow?.();
     
@@ -223,6 +229,13 @@ export class OnboardingService {
     const tour = this._currentTour();
     if (!tour) return;
     
+    // 埋點：跳過時記錄卡在哪一步 + 停留時長（完成率分析核心數據）
+    this.audit.trackTour('skipped', tour.id, {
+      atStep: this._currentStepIndex(),
+      totalSteps: tour.steps.length,
+      durationMs: this.tourStartedAt ? Date.now() - this.tourStartedAt : 0
+    });
+
     this.updateProgress(tour.id, {
       tourId: tour.id,
       currentStep: this._currentStepIndex(),
@@ -241,6 +254,10 @@ export class OnboardingService {
     const tour = this._currentTour();
     if (!tour) return;
     
+    this.audit.trackTour('completed', tour.id, {
+      durationMs: this.tourStartedAt ? Date.now() - this.tourStartedAt : 0
+    });
+
     this.updateProgress(tour.id, {
       tourId: tour.id,
       currentStep: tour.steps.length,

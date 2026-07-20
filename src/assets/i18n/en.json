@@ -215,7 +215,6 @@
     "disconnected": "Disconnected",
     "connecting": "Connecting...",
     "loginRequired": "Login Required",
-    "banned": "Banned",
     "limited": "Limited",
     "sessionFile": "Session File",
     "connectionTest": "Test Connection",
@@ -976,24 +975,6 @@
   },
   "p15": {
     "queueRecovery": "Queue Recovery",
-    "recoveredMessages": "Recovered pending messages",
-    "abTestSelect": "Select A/B Test (Optional)",
-    "abTestNone": "Don't Use",
-    "abTestAutoSelect": "Backend will auto-select template variant",
-    "notifications": "Notifications",
-    "noNotifications": "No notifications",
-    "markAllRead": "Mark All Read",
-    "deadLetterAlert": "Message delivery failed",
-    "enteredDeadLetter": "entered dead letter queue",
-    "contacts": "Contacts",
-    "contactsTotal": "Total Contacts",
-    "recentAdded": "Added Recently",
-    "byStatus": "By Status",
-    "bySource": "By Source",
-    "httpFallback": "HTTP API mode active"
-  },
-  "p15": {
-    "queueRecovery": "Queue Recovery",
     "queueRecoveryDesc": "Pending messages restored on restart",
     "contactsApi": "Contacts API",
     "contactsApiDesc": "Load contacts via REST in HTTP mode",
@@ -1001,5 +982,39 @@
     "abTestInBatchDesc": "Select a running test to auto-pick variant",
     "businessNotify": "Business Notifications",
     "businessNotifyDesc": "Scoring, dedup, A/B results in notification center"
+  },
+  "dashboardSetup": {
+    "title": "Get your first acquisition pipeline running",
+    "subtitle": "Complete 5 setup steps — the system will monitor keywords, nurture leads with AI, and collect prospects automatically",
+    "progressLabel": "Setup progress",
+    "next": "Next",
+    "steps": {
+      "account": {
+        "label": "Add account",
+        "desc": "Connect your Telegram account"
+      },
+      "groups": {
+        "label": "Add monitored groups",
+        "desc": "Choose target groups to listen to"
+      },
+      "keywords": {
+        "label": "Set keywords",
+        "desc": "Define keywords that trigger leads"
+      },
+      "rules": {
+        "label": "Configure trigger rules",
+        "desc": "Set automatic actions on match"
+      },
+      "monitor": {
+        "label": "Start monitoring",
+        "desc": "One click to start acquiring"
+      }
+    }
+  },
+  "monitoringSetup": {
+    "title": "Complete monitoring setup",
+    "subtitle": "Groups (where) → Keywords (what) → Rules (then what)",
+    "progressLabel": "Setup progress",
+    "next": "Next"
   }
 }

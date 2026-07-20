@@ -173,7 +173,7 @@
     "manageGroups": "管理分组",
     "online": "在线",
     "offline": "离线",
-    "banned": "封禁",
+    "banned": "已封禁",
     "total": "总计",
     "selectAll": "全选",
     "gridView": "卡片视图",
@@ -215,7 +215,6 @@
     "disconnected": "已断开",
     "connecting": "连接中...",
     "loginRequired": "需要登录",
-    "banned": "已封禁",
     "limited": "受限",
     "sessionFile": "Session 文件",
     "connectionTest": "测试连接",
@@ -976,24 +975,6 @@
   },
   "p15": {
     "queueRecovery": "队列恢复",
-    "recoveredMessages": "已恢复待处理消息",
-    "abTestSelect": "选择 A/B 测试（可选）",
-    "abTestNone": "不使用",
-    "abTestAutoSelect": "后端将自动选择模板变体并记录效果",
-    "notifications": "通知",
-    "noNotifications": "暂无通知",
-    "markAllRead": "全部标记已读",
-    "deadLetterAlert": "消息送达失败",
-    "enteredDeadLetter": "已进入死信队列",
-    "contacts": "联系人",
-    "contactsTotal": "联系人总数",
-    "recentAdded": "近期新增",
-    "byStatus": "按状态",
-    "bySource": "按来源",
-    "httpFallback": "HTTP API 模式已启用"
-  },
-  "p15": {
-    "queueRecovery": "队列恢复",
     "queueRecoveryDesc": "重启后恢复待处理消息",
     "contactsApi": "联系人 API",
     "contactsApiDesc": "HTTP 模式下通过 REST 加载联系人",
@@ -1001,5 +982,39 @@
     "abTestInBatchDesc": "选择进行中的测试由后端自动选变体",
     "businessNotify": "业务通知",
     "businessNotifyDesc": "评分、去重、A/B 结果会出现在通知中心"
+  },
+  "dashboardSetup": {
+    "title": "跑通你的第一条获客链路",
+    "subtitle": "完成 5 个上手步骤，系统将自动监控关键词、AI 策划培育并沉淀潜在客户",
+    "progressLabel": "上手进度",
+    "next": "下一步",
+    "steps": {
+      "account": {
+        "label": "添加帐号",
+        "desc": "连接你的 Telegram 帐号"
+      },
+      "groups": {
+        "label": "添加监控群组",
+        "desc": "选择要监听的目标群组"
+      },
+      "keywords": {
+        "label": "设置关键词",
+        "desc": "定义触发线索的关键词"
+      },
+      "rules": {
+        "label": "配置触发规则",
+        "desc": "设定命中后的自动动作"
+      },
+      "monitor": {
+        "label": "启动监控",
+        "desc": "一键启动，开始自动获客"
+      }
+    }
+  },
+  "monitoringSetup": {
+    "title": "完成监控配置",
+    "subtitle": "群组（听哪里）→ 关键词（听什么）→ 规则（听到后做什么）",
+    "progressLabel": "配置进度",
+    "next": "下一步"
   }
 }

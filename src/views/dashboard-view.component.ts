@@ -9,7 +9,7 @@
  * - 更多操作：默認折疊（快速操作面板 / 工作流控制 / 快速工作流）
  * - 無 smart/classic 模式切換（隨會員等級自動解鎖對應功能）
  */
-import { Component, inject, signal, computed, OnInit, OnDestroy, ChangeDetectionStrategy } from '@angular/core';
+import { Component, inject, signal, computed, effect, OnInit, OnDestroy, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { I18nService } from '../i18n.service';
@@ -20,6 +20,7 @@ import { AccountManagementService } from '../services/account-management.service
 import { NavBridgeService, LegacyView } from '../services/nav-bridge.service';
 import { MonitoringManagementService } from '../services/monitoring-management.service';
 import { AutomationWorkflowService } from '../services/automation-workflow.service';
+import { AuditTrackerService } from '../services/audit-tracker.service';
 
 // 子組件導入
 import { QuickWorkflowComponent } from '../quick-workflow.component';
@@ -101,15 +102,15 @@ interface SetupStep {
               </svg>
               <div class="absolute inset-0 flex flex-col items-center justify-center">
                 <span class="text-3xl font-bold" style="color: var(--text-primary);">{{ completedSteps() }}<span class="text-lg font-medium" style="color: var(--text-muted);">/5</span></span>
-                <span class="text-xs mt-0.5" style="color: var(--text-muted);">上手進度</span>
+                <span class="text-xs mt-0.5" style="color: var(--text-muted);">{{ t('dashboardSetup.progressLabel') }}</span>
               </div>
             </div>
 
             <!-- 標題 + 下一步CTA -->
             <div class="flex-1 min-w-0 text-center lg:text-left">
-              <h3 class="text-2xl font-bold mb-2" style="color: var(--text-primary);">跑通你的第一條獲客鏈路</h3>
+              <h3 class="text-2xl font-bold mb-2" style="color: var(--text-primary);">{{ t('dashboardSetup.title') }}</h3>
               <p class="text-sm mb-5 leading-relaxed" style="color: var(--text-muted);">
-                完成 5 個上手步驟，系統將自動監控關鍵詞、AI 策劃培育並沉澱潛在客戶
+                {{ t('dashboardSetup.subtitle') }}
               </p>
               @if (currentStep(); as step) {
                 <button (click)="goNextStep()"
@@ -119,7 +120,7 @@ interface SetupStep {
                   <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <polygon points="5 3 19 12 5 21 5 3"/>
                   </svg>
-                  <span>下一步：{{ step.label }}</span>
+                  <span>{{ t('dashboardSetup.next') }}：{{ step.label }}</span>
                 </button>
               }
             </div>
@@ -573,6 +574,38 @@ export class DashboardViewComponent implements OnInit, OnDestroy {
   private accountService = inject(AccountManagementService);
   public membershipService = inject(MembershipService);
   public automationWorkflow = inject(AutomationWorkflowService);
+  private audit = inject(AuditTrackerService);
+
+  /**
+   * 埋點：上手漏斗步驟「首次完成」事件（localStorage 去重，跨會話只記一次）。
+   * 有了每步的完成時間戳，就能算出用戶從安裝到跑通鏈路卡在哪一步、卡了多久。
+   */
+  private readonly funnelTracker = effect(() => {
+    const steps = this.setupSteps();
+    // 狀態尚未載入時（全 false 且無帳號數據）不記，避免誤判
+    if (!this.statusLoaded()) return;
+    let done: Record<string, number>;
+    try {
+      done = JSON.parse(localStorage.getItem('funnel_steps_done') || '{}');
+    } catch { done = {}; }
+    let changed = false;
+    steps.forEach((s, i) => {
+      if (s.done && !done[s.id]) {
+        done[s.id] = Date.now();
+        this.audit.trackFunnelStep(s.id, i);
+        changed = true;
+      }
+    });
+    if (changed) {
+      localStorage.setItem('funnel_steps_done', JSON.stringify(done));
+      if (steps.every(s => s.done) && !done['__all__']) {
+        done['__all__'] = Date.now();
+        localStorage.setItem('funnel_steps_done', JSON.stringify(done));
+        const first = Math.min(...steps.map(s => done[s.id] || Date.now()));
+        this.audit.track('funnel.setup_completed', { totalMs: Date.now() - first });
+      }
+    }
+  });
 
   // 內部狀態
   starting = signal(false);
@@ -594,6 +627,8 @@ export class DashboardViewComponent implements OnInit, OnDestroy {
 
   private _status = signal<SystemStatus>({});
   status = this._status.asReadonly();
+  /** 是否已收到至少一次後端狀態（漏斗埋點防誤判用） */
+  statusLoaded = computed(() => Object.keys(this._status()).length > 0);
 
   // 🔧 P0: 計算屬性（同時檢查 is_connected 和 status）
   onlineAccountsCount = computed(() => {
@@ -652,15 +687,21 @@ export class DashboardViewComponent implements OnInit, OnDestroy {
     { id: 'deal', label: '組群成交', view: 'leads', icon: 'trend' }
   ] as const;
 
-  /** 5步上手清單（每步完成狀態來自真實服務/IPC狀態） */
+  /** 5步上手清單（每步完成狀態來自真實服務/IPC狀態；文案走 i18n，t() 讀 signal 會自動跟隨語言切換） */
   setupSteps = computed<SetupStep[]>(() => {
     const s = this.status();
+    const step = (id: SetupStep['id'], done: boolean): SetupStep => ({
+      id,
+      label: this.t(`dashboardSetup.steps.${id}.label`),
+      desc: this.t(`dashboardSetup.steps.${id}.desc`),
+      done
+    });
     return [
-      { id: 'account', label: '添加帳號', desc: '連接你的 Telegram 帳號', done: this.totalAccountsCount() > 0 },
-      { id: 'groups', label: '添加監控群組', desc: '選擇要監聽的目標群組', done: (s.monitoring?.groups ?? 0) > 0 },
-      { id: 'keywords', label: '設置關鍵詞', desc: '定義觸發線索的關鍵詞', done: (s.keywords?.sets ?? 0) > 0 },
-      { id: 'rules', label: '配置觸發規則', desc: '設定命中後的自動動作', done: this.triggerRulesTotalCount() > 0 },
-      { id: 'monitor', label: '啟動監控', desc: '一鍵啟動，開始自動獲客', done: this.isMonitoring() }
+      step('account', this.totalAccountsCount() > 0),
+      step('groups', (s.monitoring?.groups ?? 0) > 0),
+      step('keywords', (s.keywords?.sets ?? 0) > 0),
+      step('rules', this.triggerRulesTotalCount() > 0),
+      step('monitor', this.isMonitoring())
     ];
   });
 

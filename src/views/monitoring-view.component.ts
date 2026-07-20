@@ -107,14 +107,14 @@ const ACTION_TO_TAB: Record<string, string> = {
               </svg>
               <div class="absolute inset-0 flex flex-col items-center justify-center">
                 <span class="text-xl font-bold" style="color: var(--text-primary);">{{ configStatus().completedCount }}<span class="text-sm font-medium" style="color: var(--text-muted);">/{{ configStatus().totalCount }}</span></span>
-                <span class="text-[10px]" style="color: var(--text-muted);">配置進度</span>
+                <span class="text-[10px]" style="color: var(--text-muted);">{{ t('monitoringSetup.progressLabel') }}</span>
               </div>
             </div>
 
             <div class="flex-1 min-w-0 text-center md:text-left">
-              <h3 class="text-xl font-bold mb-1" style="color: var(--text-primary);">完成監控配置</h3>
+              <h3 class="text-xl font-bold mb-1" style="color: var(--text-primary);">{{ t('monitoringSetup.title') }}</h3>
               <p class="text-sm mb-4" style="color: var(--text-muted);">
-                群組（聽哪裡）→ 關鍵詞（聽什麼）→ 規則（聽到後做什麼）
+                {{ t('monitoringSetup.subtitle') }}
               </p>
               @if (configStatus().nextStep; as next) {
                 <button (click)="handleConfigAction(next.action || '')"
@@ -123,7 +123,7 @@ const ACTION_TO_TAB: Record<string, string> = {
                   <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <polygon points="5 3 19 12 5 21 5 3"/>
                   </svg>
-                  <span>下一步：{{ next.name }}</span>
+                  <span>{{ t('monitoringSetup.next') }}：{{ next.name }}</span>
                 </button>
               }
             </div>

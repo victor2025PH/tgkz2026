@@ -1031,47 +1031,32 @@ export interface Account {
         }
       </div>
       
-      <!-- 🆕 群組詳情彈窗 -->
+      <!-- 群組詳情彈窗 -->
       @if (showDetailDialog() && selectedResource(); as resource) {
         <div class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
              (click)="closeDetail()">
-          <div class="bg-slate-800 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden shadow-2xl border border-slate-700"
+          <div class="sd-dialog rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden shadow-2xl"
                (click)="$event.stopPropagation()">
             <!-- 彈窗標題欄 -->
-            <div class="px-6 py-4 border-b border-slate-700 flex items-center justify-between bg-slate-800/95">
+            <div class="px-6 py-4 flex items-center justify-between" style="border-bottom: 1px solid var(--border-default);">
               <div class="flex items-center gap-3">
-                <span class="px-3 py-1 text-sm rounded-full font-medium" 
-                      [class]="resource.resource_type === 'channel' ? 'bg-purple-500/30 text-purple-300' : 'bg-blue-500/30 text-blue-300'">
-                  {{ resource.resource_type === 'channel' ? '📢 頻道' : '👥 群組' }}
+                <span class="px-3 py-1 text-sm rounded-full font-medium"
+                      [style.background]="resource.resource_type === 'channel' ? 'color-mix(in srgb, var(--accent) 25%, transparent)' : 'var(--info-bg)'"
+                      [style.color]="resource.resource_type === 'channel' ? 'var(--accent-light)' : 'var(--info)'">
+                  {{ resource.resource_type === 'channel' ? '頻道' : '群組' }}
                 </span>
-                <h2 class="text-xl font-bold text-white">群組詳情</h2>
-                <!-- 🆕 導航計數 -->
-                <span class="text-sm text-slate-400">
+                <h2 class="text-xl font-bold" style="color: var(--text-primary);">群組詳情</h2>
+                <span class="text-sm" style="color: var(--text-muted);">
                   {{ selectedResourceIndex() + 1 }} / {{ filteredResources().length }}
                 </span>
               </div>
               <div class="flex items-center gap-2">
-                <!-- 🆕 導航按鈕 -->
-                <button (click)="navigatePrev()" 
-                        [disabled]="!canNavigatePrev()"
-                        class="p-2 rounded-lg transition-all"
-                        [class]="canNavigatePrev() ? 'text-slate-400 hover:text-white hover:bg-slate-700' : 'text-slate-600 cursor-not-allowed'"
-                        title="上一個 (← 鍵)">
-                  ←
-                </button>
-                <button (click)="navigateNext()" 
-                        [disabled]="!canNavigateNext()"
-                        class="p-2 rounded-lg transition-all"
-                        [class]="canNavigateNext() ? 'text-slate-400 hover:text-white hover:bg-slate-700' : 'text-slate-600 cursor-not-allowed'"
-                        title="下一個 (→ 鍵)">
-                  →
-                </button>
-                <div class="w-px h-6 bg-slate-700 mx-1"></div>
-                <button (click)="closeDetail()" 
-                        class="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-all"
-                        title="關閉 (Esc 鍵)">
-                  ✕
-                </button>
+                <button (click)="navigatePrev()" [disabled]="!canNavigatePrev()"
+                        class="sd-btn sd-btn-ghost" style="padding: 0.5rem;" title="上一個 (← 鍵)">←</button>
+                <button (click)="navigateNext()" [disabled]="!canNavigateNext()"
+                        class="sd-btn sd-btn-ghost" style="padding: 0.5rem;" title="下一個 (→ 鍵)">→</button>
+                <div class="w-px h-6 mx-1" style="background: var(--border-default);"></div>
+                <button (click)="closeDetail()" class="sd-btn sd-btn-ghost" style="padding: 0.5rem;" title="關閉 (Esc 鍵)">✕</button>
               </div>
             </div>
             
@@ -1083,84 +1068,86 @@ export interface Account {
                   {{ resource.title[0] || '?' }}
                 </div>
                 <div class="flex-1 min-w-0">
-                  <h3 class="text-2xl font-bold text-white mb-1">{{ resource.title }}</h3>
+                  <h3 class="text-2xl font-bold mb-1" style="color: var(--text-primary);">{{ resource.title }}</h3>
                   @if (resource.username) {
-                    <a [href]="'https://t.me/' + resource.username" target="_blank" 
-                       class="text-cyan-400 hover:underline">
+                    <a [href]="'https://t.me/' + resource.username" target="_blank"
+                       class="hover:underline" style="color: var(--primary-light);">
                       @{{ resource.username }}
                     </a>
                   }
                 </div>
                 <button (click)="toggleSave(resource)"
-                        class="p-3 rounded-xl transition-all"
-                        [class]="resource.is_saved ? 'bg-yellow-500/20 text-yellow-400' : 'bg-slate-700 text-slate-400 hover:bg-yellow-500/20 hover:text-yellow-400'">
-                  {{ resource.is_saved ? '⭐' : '☆' }}
+                        class="sd-btn"
+                        [class.sd-btn-warn]="!!resource.is_saved"
+                        [class.sd-btn-ghost]="!resource.is_saved"
+                        style="padding: 0.75rem;"
+                        [title]="resource.is_saved ? '取消收藏' : '收藏'">
+                  <svg class="sd-ico" viewBox="0 0 24 24" [attr.fill]="resource.is_saved ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                  </svg>
                 </button>
               </div>
-              
-              <!-- 📊 基本信息 -->
-              <div class="bg-slate-900/50 rounded-xl p-4 mb-4">
-                <h4 class="text-slate-300 font-medium mb-3 flex items-center gap-2">
-                  <span>📊</span> 基本信息
-                </h4>
+
+              <!-- 基本信息 -->
+              <div class="sd-section mb-4">
+                <h4 class="sd-section-title">基本信息</h4>
                 <div class="grid grid-cols-2 gap-4">
                   <div>
-                    <div class="text-slate-500 text-sm mb-1">類型</div>
-                    <div class="text-white">{{ resource.resource_type === 'channel' ? '頻道' : '群組' }}</div>
+                    <div class="text-sm mb-1" style="color: var(--text-disabled);">類型</div>
+                    <div style="color: var(--text-primary);">{{ resource.resource_type === 'channel' ? '頻道' : '群組' }}</div>
                   </div>
                   <div>
-                    <div class="text-slate-500 text-sm mb-1">Telegram ID</div>
+                    <div class="text-sm mb-1" style="color: var(--text-disabled);">Telegram ID</div>
                     <div class="flex items-center gap-2">
                       @if (resource.telegram_id) {
-                        <code class="font-mono text-cyan-300">{{ resource.telegram_id }}</code>
+                        <code class="font-mono" style="color: var(--primary-light);">{{ resource.telegram_id }}</code>
                         <button (click)="copyId(resource, $event)"
-                                class="px-2 py-1 text-xs rounded transition-all"
-                                [class]="copiedId() === resource.telegram_id ? 'bg-green-500/20 text-green-400' : 'bg-slate-700 text-slate-400 hover:bg-cyan-500/20 hover:text-cyan-400'">
-                          {{ copiedId() === resource.telegram_id ? '✓' : '📋' }}
+                                class="sd-btn sd-btn-ghost text-xs" style="padding: 0.25rem 0.5rem;">
+                          {{ copiedId() === resource.telegram_id ? '已複製' : '複製' }}
                         </button>
                       } @else if (resource.username) {
-                        <code class="font-mono text-slate-400">@{{ resource.username }}</code>
+                        <code class="font-mono" style="color: var(--text-muted);">@{{ resource.username }}</code>
                         @if (resource.status !== 'joined' && resource.status !== 'monitoring') {
-                          <span class="text-xs text-blue-400/80" title="加入群組後系統會自動獲取完整數字 ID">加入後自動獲取</span>
+                          <span class="text-xs" style="color: var(--info);" title="加入群組後系統會自動獲取完整數字 ID">加入後自動獲取</span>
                         } @else {
-                          <span class="text-xs text-blue-400/80" title="正在同步ID...">🔄 同步中</span>
+                          <span class="text-xs" style="color: var(--info);" title="正在同步ID...">同步中</span>
                         }
                       } @else if (resource.invite_link || resource.link) {
-                        <span class="text-xs text-blue-400/80">私有群組（可通過邀請鏈接加入）</span>
+                        <span class="text-xs" style="color: var(--info);">私有群組（可通過邀請鏈接加入）</span>
                       } @else {
-                        <span class="text-slate-500 text-xs">信息不完整（來自第三方索引）</span>
+                        <span class="text-xs" style="color: var(--text-disabled);">信息不完整（來自第三方索引）</span>
                       }
                     </div>
                   </div>
                   <div>
-                    <div class="text-slate-500 text-sm mb-1">Username</div>
+                    <div class="text-sm mb-1" style="color: var(--text-disabled);">Username</div>
                     <div class="flex items-center gap-2">
                       @if (resource.username) {
-                        <span class="text-white">@{{ resource.username }}</span>
+                        <span style="color: var(--text-primary);">@{{ resource.username }}</span>
                         <button (click)="copyLink(resource, $event)"
-                                class="px-2 py-1 text-xs bg-slate-700 text-slate-400 hover:bg-cyan-500/20 hover:text-cyan-400 rounded transition-all">
-                          🔗
+                                class="sd-btn sd-btn-ghost text-xs" style="padding: 0.25rem 0.5rem;">
+                          {{ copiedLink() === resource.username ? '已複製' : '複製連結' }}
                         </button>
                       } @else {
-                        <span class="text-slate-500">無</span>
+                        <span style="color: var(--text-disabled);">無</span>
                       }
                     </div>
                   </div>
                   <div>
-                    <div class="text-slate-500 text-sm mb-1">連結</div>
+                    <div class="text-sm mb-1" style="color: var(--text-disabled);">連結</div>
                     @if (resource.username) {
-                      <a [href]="'https://t.me/' + resource.username" target="_blank" 
-                         class="text-cyan-400 hover:underline text-sm">
+                      <a [href]="'https://t.me/' + resource.username" target="_blank"
+                         class="hover:underline text-sm" style="color: var(--primary-light);">
                         t.me/{{ resource.username }}
                       </a>
                     } @else if (resource.invite_link || resource.link) {
-                      <span class="text-blue-400 text-sm">有邀請鏈接（私有群組）</span>
+                      <span class="text-sm" style="color: var(--info);">有邀請鏈接（私有群組）</span>
                     } @else {
-                      <span class="text-slate-500">無公開連結（第三方索引數據）</span>
+                      <span style="color: var(--text-disabled);">無公開連結（第三方索引數據）</span>
                     }
                   </div>
                   <div>
-                    <div class="text-slate-500 text-sm mb-1">可達性</div>
+                    <div class="text-sm mb-1" style="color: var(--text-disabled);">可達性</div>
                     <span class="text-xs px-2 py-1 rounded"
                           [ngClass]="{
                             'bg-green-500/10 text-green-400': (resource.accessibility || getAccessibility(resource)) === 'public',
@@ -1174,34 +1161,29 @@ export interface Account {
                 </div>
               </div>
               
-              <!-- 👥 成員數據 -->
-              <div class="bg-slate-900/50 rounded-xl p-4 mb-4">
-                <h4 class="text-slate-300 font-medium mb-3 flex items-center gap-2">
-                  <span>👥</span> 成員數據
-                </h4>
+              <!-- 成員數據 -->
+              <div class="sd-section mb-4">
+                <h4 class="sd-section-title">成員數據</h4>
                 <div class="grid grid-cols-3 gap-4">
-                  <div class="text-center p-3 bg-slate-800/50 rounded-lg">
-                    <div class="text-2xl font-bold text-cyan-400">{{ resource.member_count | number }}</div>
-                    <div class="text-slate-500 text-sm">總成員</div>
+                  <div class="text-center p-3 rounded-lg" style="background: var(--bg-tertiary);">
+                    <div class="text-2xl font-bold" style="color: var(--primary-light);">{{ resource.member_count | number }}</div>
+                    <div class="text-sm" style="color: var(--text-disabled);">總成員</div>
                   </div>
-                  <div class="text-center p-3 bg-slate-800/50 rounded-lg">
-                    <div class="text-xl font-bold text-yellow-400 mb-1">
-                      @if ((resource.overall_score || 0) >= 0.7) {
-                        ⭐⭐⭐
-                      } @else if ((resource.overall_score || 0) >= 0.5) {
-                        ⭐⭐
-                      } @else {
-                        ⭐
-                      }
+                  <div class="text-center p-3 rounded-lg" style="background: var(--bg-tertiary);">
+                    <div class="text-sm font-bold mb-1" style="color: var(--warning);">
+                      @if ((resource.overall_score || 0) >= 0.7) { 高度相關 }
+                      @else if ((resource.overall_score || 0) >= 0.5) { 中度相關 }
+                      @else { 一般相關 }
                     </div>
-                    <div class="text-cyan-400 font-mono text-lg">{{ formatScore(resource.overall_score) }}</div>
-                    <div class="text-slate-500 text-xs">相關度</div>
+                    <div class="font-mono text-lg" style="color: var(--primary-light);">{{ formatScore(resource.overall_score) }}</div>
+                    <div class="text-xs" style="color: var(--text-disabled);">相關度</div>
                   </div>
-                  <div class="text-center p-3 bg-slate-800/50 rounded-lg">
-                    <div class="text-2xl font-bold" [class]="resource.status === 'monitoring' ? 'text-green-400' : resource.status === 'joined' ? 'text-blue-400' : resource.status === 'paused' ? 'text-yellow-400' : 'text-slate-400'">
+                  <div class="text-center p-3 rounded-lg" style="background: var(--bg-tertiary);">
+                    <div class="text-2xl font-bold"
+                         [style.color]="resource.status === 'monitoring' ? 'var(--success)' : resource.status === 'joined' ? 'var(--info)' : resource.status === 'paused' ? 'var(--warning)' : 'var(--text-muted)'">
                       {{ (resource.status === 'joined' || resource.status === 'monitoring' || resource.status === 'paused') ? '✓' : '—' }}
                     </div>
-                    <div class="text-slate-500 text-sm">
+                    <div class="text-sm" style="color: var(--text-disabled);">
                       @if (resource.status === 'monitoring') {
                         監控中
                       } @else if (resource.status === 'paused') {
@@ -1217,50 +1199,46 @@ export interface Account {
                   </div>
                 </div>
               </div>
-              
-              <!-- 📝 描述 -->
+
+              <!-- 描述 -->
               @if (resource.description) {
-                <div class="bg-slate-900/50 rounded-xl p-4 mb-4">
-                  <h4 class="text-slate-300 font-medium mb-3 flex items-center gap-2">
-                    <span>📝</span> 群組描述
-                  </h4>
-                  <p class="text-slate-400 whitespace-pre-wrap">{{ resource.description }}</p>
+                <div class="sd-section mb-4">
+                  <h4 class="sd-section-title">群組描述</h4>
+                  <p class="whitespace-pre-wrap" style="color: var(--text-muted);">{{ resource.description }}</p>
                 </div>
               }
-              
-              <!-- 🏷️ 來源信息 -->
-              <div class="bg-slate-900/50 rounded-xl p-4">
-                <h4 class="text-slate-300 font-medium mb-3 flex items-center gap-2">
-                  <span>🏷️</span> 來源信息
-                </h4>
+
+              <!-- 來源信息 -->
+              <div class="sd-section">
+                <h4 class="sd-section-title">來源信息</h4>
                 <div class="flex flex-wrap gap-2">
                   @if (resource.sources && resource.sources.length > 0) {
                     @for (src of resource.sources; track src) {
-                      <span class="px-3 py-1 bg-slate-700 text-slate-300 rounded-full text-sm">
+                      <span class="px-3 py-1 rounded-full text-sm" style="background: var(--bg-tertiary); color: var(--text-secondary);">
                         {{ getSourceLabel(src) }}
                       </span>
                     }
                     @if (resource.sources.length > 1) {
-                      <span class="px-3 py-1 bg-emerald-500/20 text-emerald-400 rounded-full text-sm">
-                        🔗 多來源交叉驗證
+                      <span class="px-3 py-1 rounded-full text-sm" style="background: var(--success-bg); color: var(--success);">
+                        多來源交叉驗證
                       </span>
                     }
                   } @else if (resource.source) {
-                    <span class="px-3 py-1 bg-slate-700 text-slate-300 rounded-full text-sm">
+                    <span class="px-3 py-1 rounded-full text-sm" style="background: var(--bg-tertiary); color: var(--text-secondary);">
                       來源：{{ getSourceLabel(resource.source) }}
                     </span>
                   } @else if (resource.discovery_source) {
-                    <span class="px-3 py-1 bg-slate-700 text-slate-300 rounded-full text-sm">
+                    <span class="px-3 py-1 rounded-full text-sm" style="background: var(--bg-tertiary); color: var(--text-secondary);">
                       來源：{{ getSourceLabel(resource.discovery_source) }}
                     </span>
                   }
                   @if (resource.discovery_keyword) {
-                    <span class="px-3 py-1 bg-cyan-500/20 text-cyan-400 rounded-full text-sm">
+                    <span class="px-3 py-1 rounded-full text-sm" style="background: var(--primary-bg); color: var(--primary-light);">
                       關鍵詞：{{ resource.discovery_keyword }}
                     </span>
                   }
                   @if (resource.created_at) {
-                    <span class="px-3 py-1 bg-slate-700 text-slate-300 rounded-full text-sm">
+                    <span class="px-3 py-1 rounded-full text-sm" style="background: var(--bg-tertiary); color: var(--text-secondary);">
                       發現時間：{{ resource.created_at | date:'yyyy-MM-dd HH:mm' }}
                     </span>
                   }
@@ -1388,57 +1366,56 @@ export interface Account {
         </div>
       }
       
-      <!-- 🔧 Phase3: 標籤編輯器彈窗 -->
+      <!-- 標籤編輯器彈窗 -->
       @if (showTagEditor() && tagEditorTarget(); as resource) {
         <div class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4"
              (click)="closeTagEditor()">
-          <div class="bg-slate-800 rounded-2xl border border-slate-700/50 shadow-2xl w-full max-w-md overflow-hidden"
+          <div class="sd-dialog rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
                (click)="$event.stopPropagation()">
-            <div class="px-6 py-4 border-b border-slate-700 flex items-center justify-between">
-              <h3 class="text-lg font-bold text-white flex items-center gap-2">
-                🏷️ 管理標籤
-              </h3>
-              <button (click)="closeTagEditor()" class="text-slate-400 hover:text-white text-xl">✕</button>
+            <div class="px-6 py-4 flex items-center justify-between" style="border-bottom: 1px solid var(--border-default);">
+              <h3 class="text-lg font-bold" style="color: var(--text-primary);">管理標籤</h3>
+              <button (click)="closeTagEditor()" class="text-xl" style="color: var(--text-muted);">✕</button>
             </div>
             <div class="px-6 py-4">
-              <div class="text-sm text-slate-400 mb-3">{{ resource.title }}</div>
-              
+              <div class="text-sm mb-3" style="color: var(--text-muted);">{{ resource.title }}</div>
+
               <!-- 已有標籤 -->
               <div class="flex flex-wrap gap-2 mb-4">
                 @for (tag of getResourceTags(resource); track tag) {
-                  <span class="px-3 py-1 bg-amber-500/20 text-amber-400 rounded-full text-sm flex items-center gap-1 group">
-                    🏷️ {{ tag }}
+                  <span class="px-3 py-1 rounded-full text-sm flex items-center gap-1 group"
+                        style="background: var(--warning-bg); color: var(--warning);">
+                    {{ tag }}
                     <button (click)="removeTagFromResource(resource, tag)"
-                            class="ml-1 text-amber-500/50 hover:text-red-400 transition-all">✕</button>
+                            class="ml-1 transition-all" style="color: var(--warning); opacity: 0.6;">✕</button>
                   </span>
                 }
                 @if (getResourceTags(resource).length === 0) {
-                  <span class="text-slate-500 text-sm">暫無標籤</span>
+                  <span class="text-sm" style="color: var(--text-disabled);">暫無標籤</span>
                 }
               </div>
-              
+
               <!-- 添加新標籤 -->
               <div class="flex items-center gap-2 mb-4">
-                <input type="text" 
+                <input type="text"
                        [value]="newTagInput()"
                        (input)="newTagInput.set($any($event.target).value)"
                        (keyup.enter)="addTagToResource()"
                        placeholder="輸入新標籤..."
-                       class="flex-1 bg-slate-700/50 border border-slate-600 rounded-lg py-2 px-3 text-white text-sm placeholder-slate-500 focus:border-amber-500/50 focus:outline-none">
+                       class="sd-input flex-1 py-2 px-3 text-sm">
                 <button (click)="addTagToResource()"
                         [disabled]="!newTagInput().trim()"
-                        class="px-4 py-2 bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 rounded-lg text-sm transition-all disabled:opacity-30 disabled:cursor-not-allowed">
+                        class="sd-btn sd-btn-warn text-sm">
                   添加
                 </button>
               </div>
-              
+
               <!-- 預設標籤快速添加 -->
-              <div class="border-t border-slate-700/30 pt-3">
-                <div class="text-xs text-slate-500 mb-2">快速添加：</div>
+              <div class="pt-3" style="border-top: 1px solid var(--border-default);">
+                <div class="text-xs mb-2" style="color: var(--text-disabled);">快速添加：</div>
                 <div class="flex flex-wrap gap-1.5">
                   @for (tag of presetTags; track tag) {
                     <button (click)="addTagToResource(tag)"
-                            class="px-2.5 py-1 bg-slate-700/40 text-slate-400 hover:bg-amber-500/20 hover:text-amber-400 rounded text-xs transition-all">
+                            class="sd-btn sd-btn-ghost text-xs" style="padding: 0.25rem 0.625rem;">
                       + {{ tag }}
                     </button>
                   }
@@ -1490,6 +1467,21 @@ export interface Account {
       background: color-mix(in srgb, var(--bg-primary) 70%, transparent);
       border-radius: 0.5rem;
       color: var(--text-muted);
+    }
+    .sd-dialog {
+      background: var(--bg-card);
+      border: 1px solid var(--border-default);
+      color: var(--text-primary);
+    }
+    .sd-section {
+      background: color-mix(in srgb, var(--bg-primary) 60%, transparent);
+      border-radius: 0.75rem;
+      padding: 1rem;
+    }
+    .sd-section-title {
+      color: var(--text-secondary);
+      font-weight: 500;
+      margin-bottom: 0.75rem;
     }
     .sd-ico {
       width: 1rem;

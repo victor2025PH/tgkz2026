@@ -509,6 +509,8 @@ class HttpApiServer(AuthRoutesMixin, QuotaRoutesMixin, PaymentRoutesMixin,
         '/api/v1/auth/verify-email', '/api/v1/auth/verify-email-code',
         '/api/v1/auth/reset-password-code', '/api/v1/auth/send-verification',
         '/api/v1/auth/submit-2fa',
+        # 掃碼登錄（生成/查詢/確認 token 均無需 Bearer）
+        '/api/v1/auth/login-token',
         # OAuth
         '/api/oauth/telegram/authorize', '/api/v1/oauth/telegram',
         '/api/v1/oauth/telegram/authorize', '/api/v1/oauth/telegram/config',

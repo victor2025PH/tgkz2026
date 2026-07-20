@@ -274,7 +274,7 @@ import { HistoryCollectionDialogComponent, HistoryCollectionGroupInfo, Collectio
                     </div>
                   </div>
                   
-                  <!-- 統計行 -->
+                  <!-- 統計行 + P7-2 健康徽章 -->
                   <div class="flex items-center justify-between text-xs mb-3 px-1">
                     <div class="flex items-center gap-2">
                       <span class="text-slate-400 flex items-center gap-1">
@@ -282,15 +282,32 @@ import { HistoryCollectionDialogComponent, HistoryCollectionGroupInfo, Collectio
                         <span class="font-medium">{{ group.memberCount | number }}</span>
                       </span>
                       @if (group.stats?.matchesToday && group.stats.matchesToday > 0) {
-                        <span class="text-orange-400 flex items-center gap-1">
+                        <span class="text-orange-400 flex items-center gap-1" title="今日關鍵詞命中">
                           <span>🔥</span>
-                          <span>{{ group.stats.matchesToday }}</span>
+                          <span class="font-medium">{{ group.stats.matchesToday }}</span>
+                        </span>
+                      }
+                      @if (group.stats?.leadsToday && group.stats.leadsToday > 0) {
+                        <span class="text-emerald-400 flex items-center gap-1" title="今日新線索">
+                          <span>👤</span>
+                          <span class="font-medium">{{ group.stats.leadsToday }}</span>
                         </span>
                       }
                     </div>
-                    <span class="text-cyan-400 text-xs opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                      查看詳情 →
-                    </span>
+                    <!-- P7-2: 活躍度徽章 -->
+                    @if (group.stats?.matchesToday && group.stats.matchesToday > 0) {
+                      <span class="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">
+                        活躍
+                      </span>
+                    } @else if (group.stats?.matchesWeek && group.stats.matchesWeek > 0) {
+                      <span class="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/20">
+                        本週有活動
+                      </span>
+                    } @else if (group.isMonitoring) {
+                      <span class="px-1.5 py-0.5 rounded-full text-[9px] text-slate-500 border border-slate-700/50">
+                        靜默中
+                      </span>
+                    }
                   </div>
                   
                   <!-- 綁定的詞集標籤 - 限制高度防止溢出 -->

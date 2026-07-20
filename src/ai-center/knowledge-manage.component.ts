@@ -145,11 +145,44 @@ type SortOption = 'createdAt' | 'useCount' | 'successScore' | 'type';
             <span>載入中...</span>
           </div>
         } @else if (filteredKnowledge().length === 0) {
-          <div class="empty-state">
-            <span class="empty-icon">📚</span>
-            <h3>暫無知識</h3>
-            <p>點擊「添加知識」開始構建知識庫</p>
-            <button class="add-btn" (click)="addKnowledge()">➕ 添加知識</button>
+          <!-- 🆕 Phase 1: 豐富的空狀態設計 -->
+          <div class="empty-knowledge-state">
+            <div class="empty-hero">
+              <div class="empty-brain-icon">🧠</div>
+              <h3>知識庫還是空的</h3>
+              <p>知識庫是 AI 自動回覆的"大腦"——越豐富，AI 回覆越精準</p>
+            </div>
+
+            <!-- 快速添加方式 -->
+            <div class="empty-actions-grid">
+              <button class="empty-action-card" (click)="addKnowledge()">
+                <span class="action-icon">✏️</span>
+                <strong>手動添加</strong>
+                <span>自定義問答對</span>
+              </button>
+              <button class="empty-action-card empty-action-secondary">
+                <span class="action-icon">📄</span>
+                <strong>批量導入</strong>
+                <span>上傳 CSV / Excel</span>
+              </button>
+              <button class="empty-action-card empty-action-secondary">
+                <span class="action-icon">💬</span>
+                <strong>從對話提取</strong>
+                <span>分析歷史聊天記錄</span>
+              </button>
+            </div>
+
+            <!-- 建議知識類型 -->
+            <div class="empty-suggestions">
+              <p class="suggestions-title">💡 建議先添加以下類型的知識：</p>
+              <div class="suggestion-tags">
+                <button class="suggestion-tag" (click)="addKnowledge()">產品介紹</button>
+                <button class="suggestion-tag" (click)="addKnowledge()">常見問題</button>
+                <button class="suggestion-tag" (click)="addKnowledge()">價格說明</button>
+                <button class="suggestion-tag" (click)="addKnowledge()">開場白話術</button>
+                <button class="suggestion-tag" (click)="addKnowledge()">異議處理</button>
+              </div>
+            </div>
           </div>
         } @else {
           @for (item of paginatedKnowledge(); track item.id; let i = $index) {
@@ -472,12 +505,66 @@ type SortOption = 'createdAt' | 'useCount' | 'successScore' | 'type';
     .page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
     .page-info { font-size: 13px; color: #888; }
     
-    /* 空狀態 */
+    /* 🆕 Phase 1: 豐富的空狀態 */
+    .empty-knowledge-state {
+      padding: 40px 20px;
+      text-align: center;
+    }
+    .empty-hero { margin-bottom: 32px; }
+    .empty-brain-icon { font-size: 72px; margin-bottom: 16px; filter: drop-shadow(0 0 20px rgba(168,85,247,0.3)); }
+    .empty-hero h3 { font-size: 22px; font-weight: 700; color: #e0e0e0; margin: 0 0 8px; }
+    .empty-hero p { font-size: 14px; color: #888; max-width: 360px; margin: 0 auto; line-height: 1.6; }
+
+    .empty-actions-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      max-width: 520px;
+      margin: 0 auto 28px;
+    }
+    .empty-action-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      padding: 16px 12px;
+      background: linear-gradient(135deg, rgba(103,78,234,0.15), rgba(118,75,162,0.15));
+      border: 1px solid rgba(103,78,234,0.3);
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+      color: #e0e0e0;
+    }
+    .empty-action-card:hover { background: linear-gradient(135deg, rgba(103,78,234,0.3), rgba(118,75,162,0.3)); transform: translateY(-2px); }
+    .empty-action-secondary {
+      background: rgba(255,255,255,0.04);
+      border-color: rgba(255,255,255,0.1);
+    }
+    .empty-action-secondary:hover { background: rgba(255,255,255,0.08); }
+    .action-icon { font-size: 28px; }
+    .empty-action-card strong { font-size: 13px; font-weight: 600; }
+    .empty-action-card span:last-child { font-size: 11px; color: #888; }
+
+    .empty-suggestions { max-width: 520px; margin: 0 auto; text-align: left; }
+    .suggestions-title { font-size: 13px; color: #888; margin: 0 0 10px; }
+    .suggestion-tags { display: flex; flex-wrap: wrap; gap: 8px; }
+    .suggestion-tag {
+      padding: 6px 14px;
+      background: rgba(6,182,212,0.1);
+      border: 1px solid rgba(6,182,212,0.25);
+      border-radius: 20px;
+      font-size: 13px;
+      color: #22d3ee;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .suggestion-tag:hover { background: rgba(6,182,212,0.2); }
+
+    /* 舊版空狀態（保留兼容） */
     .empty-state {
       text-align: center;
       padding: 60px 20px;
     }
-    
     .empty-icon { font-size: 64px; display: block; margin-bottom: 16px; }
     .empty-state h3 { font-size: 18px; margin: 0 0 8px 0; color: #e0e0e0; }
     .empty-state p { font-size: 14px; color: #888; margin: 0 0 20px 0; }

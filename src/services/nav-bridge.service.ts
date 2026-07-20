@@ -13,7 +13,7 @@ import { UnifiedNavService, ViewId, ModuleId, NAV_MODULES, NavModule } from '../
  * 舊視圖類型（與 app.component.ts 中的 View 類型保持一致）
  */
 export type LegacyView = 
-  | 'dashboard' | 'accounts' | 'add-account' | 'api-credentials' 
+  | 'home' | 'dashboard' | 'accounts' | 'add-account' | 'api-credentials' 
   | 'resources' | 'member-database' | 'resource-center' | 'search-discovery' 
   | 'ai-assistant' | 'automation' | 'automation-legacy' 
   | 'leads' | 'lead-nurturing' | 'nurturing-analytics' 
@@ -22,7 +22,8 @@ export type LegacyView =
   | 'settings' | 'analytics' | 'analytics-center' 
   | 'logs' | 'performance' | 'alerts' | 'profile' | 'membership-center'
   | 'monitoring-accounts' | 'monitoring-groups' | 'keyword-sets' 
-  | 'chat-templates' | 'trigger-rules' | 'collected-users';
+  | 'chat-templates' | 'trigger-rules' | 'collected-users'
+  | 'messages';
 
 @Injectable({
   providedIn: 'root'
@@ -114,7 +115,7 @@ export class NavBridgeService {
    */
   private isValidLegacyView(view: string): view is LegacyView {
     const validViews: LegacyView[] = [
-      'dashboard', 'accounts', 'add-account', 'api-credentials',
+      'home', 'dashboard', 'accounts', 'add-account', 'api-credentials',
       'resources', 'member-database', 'resource-center', 'search-discovery',
       'ai-assistant', 'automation', 'automation-legacy',
       'leads', 'lead-nurturing', 'nurturing-analytics',
@@ -123,7 +124,8 @@ export class NavBridgeService {
       'settings', 'analytics', 'analytics-center',
       'logs', 'performance', 'alerts', 'profile', 'membership-center',
       'monitoring-accounts', 'monitoring-groups', 'keyword-sets',
-      'chat-templates', 'trigger-rules', 'collected-users'
+      'chat-templates', 'trigger-rules', 'collected-users',
+      'messages'
     ];
     return validViews.includes(view as LegacyView);
   }

@@ -231,9 +231,16 @@ export class WebVitalsService implements OnDestroy {
 
   /**
    * 發送性能報告到後端
+   * 開發/桌面版（localhost:4200 或無 HTTP API）時跳過，避免 404
    */
   private sendReport(): void {
     if (this.reported || this.metrics.length === 0) return;
+    const isDevServer = window.location.port === '4200' && window.location.hostname === 'localhost';
+    let isElectron = !!(window as any).electronAPI || !!(window as any).electron;
+    try {
+      if (!isElectron && (window as any).require) isElectron = !!(window as any).require('electron');
+    } catch {}
+    if (isDevServer || isElectron) return;
     this.reported = true;
 
     const report: PerformanceReport = {

@@ -631,11 +631,16 @@ async def handle_test_ai_model(self, payload: Dict[str, Any]):
             else:
                 error_message = f"測試失敗：{error_str[:100]}"
         
-        # 更新數據庫中的連接狀態
+        # P0+P1: 更新數據庫（含延遲 + 最後錯誤信息）
         if model_id:
             await db.execute(
-                "UPDATE ai_models SET is_connected = ?, last_tested_at = CURRENT_TIMESTAMP WHERE id = ?",
-                (1 if is_connected else 0, model_id)
+                """UPDATE ai_models
+                   SET is_connected = ?,
+                       last_tested_at = CURRENT_TIMESTAMP,
+                       latency_ms = ?,
+                       last_error_message = ?
+                   WHERE id = ?""",
+                (1 if is_connected else 0, latency_ms or 0, error_message or None, model_id)
             )
         
         if is_connected:
@@ -752,3 +757,53 @@ async def handle_get_model_usage(self, data=None):
         self.send_event("model-usage-loaded", err)
         return err
 
+
+async def handle_startup_ai_health_check(self, payload: Dict[str, Any]):
+    """
+    P1-3: 啟動靜默健康檢查 —— 測試所有 is_connected=1 的模型，不彈 Toast
+    前端在加載模型後 10 秒發送此命令；結果通過 ai-model-tested 事件更新（silent=True 標記）
+    """
+    try:
+        user_id = payload.get('_user_id', '')
+        rows = await db.fetch_all(
+            """SELECT id, provider, model_name, api_key, api_endpoint, is_local
+               FROM ai_models
+               WHERE is_connected = 1 AND user_id = ?""",
+            (user_id,)
+        )
+        if not rows:
+            return {"success": True, "checked": 0}
+
+        print(f"[AI Health] 靜默檢查 {len(rows)} 個已連接模型...", file=sys.stderr)
+        checked = 0
+        for row in rows:
+            model_id = row['id']
+            try:
+                result = await handle_test_ai_model(self, {
+                    'id': model_id,
+                    'provider': row['provider'],
+                    'modelName': row['model_name'],
+                    'apiKey': row.get('api_key', ''),
+                    'apiEndpoint': row.get('api_endpoint', ''),
+                    'isLocal': bool(row.get('is_local', 0)),
+                    '_user_id': user_id,
+                    '_silent': True,  # 前端可根據此標記跳過 Toast
+                })
+                checked += 1
+                # 添加靜默標記到事件
+                self.send_event("ai-health-check-result", {
+                    "modelId": model_id,
+                    "isConnected": result.get("isConnected", False),
+                    "latencyMs": result.get("latencyMs", 0),
+                    "error": result.get("error"),
+                    "silent": True
+                })
+            except Exception as e:
+                print(f"[AI Health] 模型 {model_id} 檢查失敗: {e}", file=sys.stderr)
+
+        print(f"[AI Health] 靜默檢查完成，共 {checked} 個", file=sys.stderr)
+        return {"success": True, "checked": checked}
+
+    except Exception as e:
+        print(f"[AI Health] 啟動健康檢查異常: {e}", file=sys.stderr)
+        return {"success": False, "error": str(e)}

@@ -40,9 +40,23 @@ export class SidebarStateService {
     } catch {}
   }
 
-  /** 初始化移動端偵測 */
+  /** 是否為 Electron 安裝版（與 auth.guard 一致） */
+  private isElectronEnv(): boolean {
+    try {
+      return !!(window as any).electronAPI || !!(window as any).electron ||
+        !!((window as any).require && (window as any).require('electron')?.ipcRenderer);
+    } catch {
+      return false;
+    }
+  }
+
+  /** 初始化移動端偵測；Electron 安裝版強制桌面布局以顯示側邊欄 */
   initMobileDetection(): void {
     if (typeof window === 'undefined') return;
+    if (this.isElectronEnv()) {
+      this.isMobile.set(false);
+      return;
+    }
     this._mediaQuery = window.matchMedia('(max-width: 768px)');
     
     this._mediaHandler = (e: MediaQueryListEvent | MediaQueryList) => {

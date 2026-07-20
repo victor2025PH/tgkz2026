@@ -2,7 +2,7 @@
 import { ChangeDetectionStrategy, Component, signal, WritableSignal, computed, inject, OnDestroy, effect, OnInit, ChangeDetectorRef, NgZone, HostListener, ViewChild } from '@angular/core';
 import { CommonModule, DOCUMENT } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { NavigationEnd, Router, RouterOutlet, RouterLink } from '@angular/router';
+import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
 import { VIEW_ROUTE_MAP } from './app.routes';
 import { filter } from 'rxjs/operators';
 // 路由動畫改用 CSS 過渡效果，不再使用 Angular animations
@@ -67,6 +67,7 @@ import { InviteGroupDialogComponent } from './dialogs/invite-group-dialog.compon
 import { LeadDetailDialogComponent } from './dialogs/lead-detail-dialog.component';
 import { AIStrategyResult } from './ai-assistant/ai-marketing-assistant.component';
 import { CommandPaletteComponent } from './components/command-palette.component';
+// NotificationBellComponent removed - messages now at /messages route
 import { UserLevelBadgeComponent } from './components/user-level-badge.component';
 import { NetworkStatusComponent } from './core/network-status.component';
 import { AuthTransitionComponent } from './core/auth-transition.component';
@@ -87,6 +88,7 @@ import { setupAllIpcHandlers } from './ipc-handlers';
 // 🔧 Phase 9-1b: Business methods 提取到外部文件（5 個域模塊）
 import { applyMethodMixins } from './app-methods';
 import { UnifiedNavService } from './components/unified-nav.service';
+import { MessagesService } from './services/messages.service';
 // 🆕 Phase 4: 統一導航組件
 // 注意：UnifiedNavComponent 和 UnifiedSidebarComponent 暫時未使用
 // 未來將用於替代現有導航
@@ -121,7 +123,7 @@ import {
 import { RAGBrainService } from './services/rag-brain.service';
 
 // 視圖類型定義
-type View = 'dashboard' | 'accounts' | 'add-account' | 'api-credentials' | 'resources' | 'resource-discovery' | 'member-database' | 'resource-center' | 'search-discovery' | 'ai-assistant' | 'automation' | 'automation-legacy' | 'leads' | 'lead-nurturing' | 'nurturing-analytics' | 'ads' | 'user-tracking' | 'campaigns' | 'multi-role' | 'ai-team' | 'ai-engine' | 'ai-center' | 'knowledge-brain' | 'knowledge-manage' | 'knowledge-gaps' | 'settings' | 'analytics' | 'analytics-center' | 'marketing-report' | 'profile' | 'membership-center' | 'wallet' | 'wallet-recharge' | 'wallet-withdraw' | 'wallet-transactions' | 'wallet-orders' | 'wallet-analytics' | 'monitoring' | 'monitoring-accounts' | 'monitoring-groups' | 'keyword-sets' | 'chat-templates' | 'trigger-rules' | 'collected-users';
+type View = 'home' | 'dashboard' | 'messages' | 'accounts' | 'add-account' | 'api-credentials' | 'resources' | 'resource-discovery' | 'member-database' | 'resource-center' | 'search-discovery' | 'ai-assistant' | 'automation' | 'automation-legacy' | 'leads' | 'lead-nurturing' | 'nurturing-analytics' | 'ads' | 'user-tracking' | 'campaigns' | 'multi-role' | 'ai-team' | 'ai-engine' | 'ai-center' | 'knowledge-brain' | 'knowledge-manage' | 'knowledge-gaps' | 'settings' | 'analytics' | 'analytics-center' | 'marketing-report' | 'profile' | 'membership-center' | 'wallet' | 'wallet-recharge' | 'wallet-withdraw' | 'wallet-transactions' | 'wallet-orders' | 'wallet-analytics' | 'monitoring' | 'monitoring-accounts' | 'monitoring-groups' | 'keyword-sets' | 'chat-templates' | 'trigger-rules' | 'collected-users';
 type LeadDetailView = 'sendMessage' | 'history';
 type LeadsViewMode = 'kanban' | 'list';
 
@@ -145,7 +147,7 @@ interface SuccessOverlayConfig {
   standalone: true,
   imports: [
     // 核心模組
-    CommonModule, FormsModule, RouterOutlet, RouterLink,
+    CommonModule, FormsModule, RouterOutlet,
     // 🔧 Phase7-1: 視圖組件已移除 — 全部透過 Router lazy-load
     // 通用組件（模板中使用）
     ToastComponent, GlobalConfirmDialogComponent, GlobalInputDialogComponent, ProgressDialogComponent,
@@ -172,6 +174,8 @@ interface SuccessOverlayConfig {
     DeleteConfirmDialogComponent, InviteGroupDialogComponent, LeadDetailDialogComponent,
     // 命令面板（模板中使用）
     CommandPaletteComponent,
+    // 🆕 P4-3: 智能通知鈴鐺
+
     // 🆕 網絡狀態和認證過渡動畫
     NetworkStatusComponent, AuthTransitionComponent,
   ],
@@ -375,6 +379,7 @@ export class AppComponent implements OnDestroy, OnInit {
   navShortcuts = inject(NavShortcutsService);
   unifiedNav = inject(UnifiedNavService);
   sidebarState = inject(SidebarStateService);  // 🔧 Phase8-P1-3
+  messagesService = inject(MessagesService);   // 消息中心（常駐IPC + 持久化）
   
   // 🆕 Phase 19-22: 專用服務
   navigationService = inject(NavigationService);
@@ -2312,18 +2317,28 @@ export class AppComponent implements OnDestroy, OnInit {
     
     // 🔧 P0: 監聽 NavBridgeService.currentView() 變化並同步到本地，並觸發 Router 導航
     // 這樣子組件調用 nav.navigateTo() 時（如「前往智能引擎」），URL 與主內容會切換到對應頁面
+    // 🔧 nav-fix: effect 在 NgZone 外執行，router.navigate 必須包裹在 ngZone.run() 中
     effect(() => {
       const navView = this.navBridge.currentView();
       const localView = this.currentView();
       
       if (!navView || navView === localView) return;
       
-      console.log('[AppComponent] 同步導航:', navView, '← from NavBridge');
       this.currentView.set(navView as View);
       // Web 模式下主內容由 RouterOutlet 決定，必須觸發路由導航否則按鈕無跳轉
       const routePath = VIEW_ROUTE_MAP[navView as keyof typeof VIEW_ROUTE_MAP];
       if (routePath) {
-        this.router.navigate([routePath]);
+        const MONITORING_SUB_VIEWS = new Set([
+          'monitoring-accounts', 'monitoring-groups', 'keyword-sets',
+          'chat-templates', 'trigger-rules', 'collected-users'
+        ]);
+        const extras = MONITORING_SUB_VIEWS.has(navView)
+          ? { queryParams: { v: navView }, queryParamsHandling: '' as const }
+          : undefined;
+        this.ngZone.run(() => {
+          this.router.navigate([routePath], extras);
+          this.cdr.markForCheck();
+        });
       }
     });
   }
@@ -2372,7 +2387,7 @@ export class AppComponent implements OnDestroy, OnInit {
     // Load saved AI settings from localStorage
     this.loadAiSettings();
     
-    // 🔧 P8-3: 初始化移動端偵測
+    // 🔧 P8-3: 初始化移動端偵測（Electron 下強制桌面布局以顯示側邊欄）
     this.initMobileDetection();
     
     // 🆕 加載保存的側邊欄分組狀態
@@ -2390,22 +2405,33 @@ export class AppComponent implements OnDestroy, OnInit {
           }
           return;
         }
+        // 🔧 nav-fix2: 監控子視圖有 ?v= 參數，優先從 query param 還原精確視圖
+        if (path === '/monitoring') {
+          const qParam = url.includes('?v=') ? url.split('?v=')[1]?.split('&')[0] : null;
+          if (qParam && this.currentView() !== qParam) {
+            this.currentView.set(qParam as View);
+            this.cdr.markForCheck();
+          }
+          return;
+        }
         // 其他路由：反查 VIEW_ROUTE_MAP（用 path 匹配，忽略 query）
         const viewEntry = Object.entries(VIEW_ROUTE_MAP).find(([, route]) => route === path);
         if (viewEntry) {
           const viewName = viewEntry[0] as View;
           if (this.currentView() !== viewName) {
             this.currentView.set(viewName);
+            this.cdr.markForCheck();
           }
         }
       }
     });
 
     // 🆕 監聽視圖切換事件（從子組件觸發）
+    // 🔧 nav-fix: window 事件回調在 NgZone 外執行，必須用 ngZone.run() 包裹
     window.addEventListener('changeView', (event: Event) => {
       const customEvent = event as CustomEvent;
       if (customEvent.detail) {
-        this.changeView(customEvent.detail as View);
+        this.ngZone.run(() => this.changeView(customEvent.detail as View));
       }
     });
 
@@ -3094,9 +3120,23 @@ export class AppComponent implements OnDestroy, OnInit {
     this.navBridge.navigateTo(view as any);
     
     // 🔧 Phase7-1: 使用 Router 導航（替代 @switch）
+    // 🔧 nav-fix: 必須在 NgZone 內執行，確保 OnPush 組件的 router-outlet 能正確更新
     const routePath = VIEW_ROUTE_MAP[view];
     if (routePath) {
-      this.router.navigate([routePath]);
+      // 🔧 nav-fix2: 監控子視圖都指向同一路由 '/monitoring'，加 queryParam 確保每次都是唯一 URL
+      // 避免 Angular 的 onSameUrlNavigation:'ignore' 默認行為導致重複點擊無效
+      const MONITORING_SUB_VIEWS = new Set([
+        'monitoring-accounts', 'monitoring-groups', 'keyword-sets',
+        'chat-templates', 'trigger-rules', 'collected-users'
+      ]);
+      const extras = MONITORING_SUB_VIEWS.has(view)
+        ? { queryParams: { v: view }, queryParamsHandling: '' as const }
+        : undefined;
+      this.ngZone.run(() => {
+        this.router.navigate([routePath], extras);
+        // 導航後強制 OnPush 重新檢測，確保 router-outlet 渲染新組件
+        this.cdr.markForCheck();
+      });
     }
     
     // 保留 currentView 信號用於側邊欄高亮

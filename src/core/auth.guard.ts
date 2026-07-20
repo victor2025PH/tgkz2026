@@ -15,6 +15,16 @@ import { AuthEventsService } from './auth-events.service';
 import { environment } from '../environments/environment';
 import { isElectronRuntime } from '../utils/runtime-env.util';
 
+/** 與 ElectronIpcService 一致：安裝版通過 window.require('electron').ipcRenderer 存在與否判斷 */
+function isElectronEnv(): boolean {
+  try {
+    return !!(window as any).electronAPI || !!(window as any).electron ||
+      !!((window as any).require && (window as any).require('electron')?.ipcRenderer);
+  } catch {
+    return false;
+  }
+}
+
 /**
  * 🔧 輔助函數：本地解析 JWT Payload，檢查是否已過期
  * 不需要訪問後端，完全在前端完成
@@ -34,9 +44,13 @@ function isTokenAlive(token: string | null): boolean {
     
     // 檢查 exp（過期時間）
     if (payload.exp && Date.now() >= payload.exp * 1000) {
-      console.warn('[AuthGuard] Access token expired at', new Date(payload.exp * 1000).toISOString());
+      if (!(window as any).__authGuardExpiredLogged) {
+        (window as any).__authGuardExpiredLogged = true;
+        console.warn('[AuthGuard] Access token expired at', new Date(payload.exp * 1000).toISOString());
+      }
       return false;
     }
+    (window as any).__authGuardExpiredLogged = false;
     return true;
   } catch {
     return false;
@@ -61,35 +75,24 @@ export const authGuard: CanActivateFn = (
   const authEvents = inject(AuthEventsService);
   const router = inject(Router);
   
-  // 本地版（Electron）不需要認證
-  // 🔧 用統一偵測（含 window.require）：本專案 renderer 靠 window.require 取 ipcRenderer，
-  // 舊條件漏判導致桌面版免登入例外失效、被踹回登入頁。
-  const isElectron = isElectronRuntime();
-  if (environment.apiMode === 'ipc' && isElectron) {
-    return true;
-  }
-  
-  // 🔧 取得 Access Token 和 Refresh Token
+  // 🔧 取得 Access Token 和 Refresh Token（安裝版也需登入後才有 Token）
   const accessToken = authService.accessToken() || localStorage.getItem('tgm_access_token');
   const refreshToken = localStorage.getItem('tgm_refresh_token');
-  
-  console.log('[AuthGuard] Checking auth:', {
-    hasAccessToken: !!accessToken,
-    accessTokenAlive: isTokenAlive(accessToken),
-    hasRefreshToken: !!refreshToken,
-    refreshTokenAlive: isTokenAlive(refreshToken)
-  });
   
   // ✅ Access Token 存在且未過期 → 放行
   if (isTokenAlive(accessToken)) {
     return true;
   }
   
-  // ⚠️ Access Token 過期，但 Refresh Token 未過期 → 放行（背景自動刷新）
+  // ⚠️ Access Token 過期，但 Refresh Token 未過期 → 放行（背景自動刷新，僅在需要時打一次日誌避免刷屏）
   if (isTokenAlive(refreshToken)) {
-    console.log('[AuthGuard] Access token expired but refresh token valid, allowing with background refresh');
+    if (!(window as any).__authGuardRefreshLogged) {
+      (window as any).__authGuardRefreshLogged = true;
+      console.log('[AuthGuard] Access token expired, refresh token valid — allowing with background refresh');
+    }
     return true;
   }
+  (window as any).__authGuardRefreshLogged = false;
   
   // ❌ 兩個都過期/不存在 → 清除殘留 Token，重定向登入頁
   console.warn('[AuthGuard] All tokens expired or missing, clearing and redirecting to login');
@@ -102,13 +105,12 @@ export const authGuard: CanActivateFn = (
 
 /**
  * 訪客守衛
- * 已登入用戶無法訪問（如登入頁）
+ * 已登入用戶無法訪問（如登入頁）；未登入允許訪問登入頁（安裝版也需先登入）
  */
 export const guestGuard: CanActivateFn = () => {
   const authService = inject(AuthService);
   const router = inject(Router);
   
-  // 🔧 修復：使用 JWT 過期檢測判斷是否真的已登入
   const token = authService.accessToken();
   const refreshToken = localStorage.getItem('tgm_refresh_token');
   

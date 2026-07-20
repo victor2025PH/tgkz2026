@@ -119,9 +119,10 @@ export class AutomationViewComponent implements OnInit, OnDestroy {
     return this.i18n.t(key, params);
   }
   
-  // 導航
+  // 導航 — 必須透過 app.component 的 changeView() 才會觸發 Router 導航
+  // NavBridgeService.navigateTo() 只更新信號，不做路由跳轉，故改用 CustomEvent
   navigateTo(view: string): void {
-    this.nav.navigateTo(view as LegacyView);
+    window.dispatchEvent(new CustomEvent('changeView', { detail: view }));
   }
   
   // 啟動監控

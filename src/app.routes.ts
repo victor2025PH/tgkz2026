@@ -57,6 +57,12 @@ export const routes: Routes = [
     redirectTo: 'dashboard',
     pathMatch: 'full'
   },
+  // 兼容舊首頁路徑 → 重定向到運控中心
+  {
+    path: 'home',
+    redirectTo: 'dashboard',
+    pathMatch: 'full'
+  },
   // ============ 🆕 精簡獲客模式 Shell（Stage 2C） ============
   // 獨立輕量導航外殼，僅承載 6 個核心獲客功能，不依賴巨型 AppComponent 側邊欄
   // 子路由導航皆停留在 /lean/* 之下，重用既有的懶加載視圖組件，不重複實現業務邏輯
@@ -114,6 +120,13 @@ export const routes: Routes = [
         path: 'dashboard',
         loadComponent: () => import('./views/dashboard-view.component').then(m => m.DashboardViewComponent),
         title: '儀表板',
+        canActivate: [authGuard]
+      },
+      // 我的消息（main 側新增，置於 AppComponent 殼內以保留側邊欄）
+      {
+        path: 'messages',
+        loadComponent: () => import('./views/messages-view.component').then(m => m.MessagesViewComponent),
+        title: '我的消息',
         canActivate: [authGuard]
       },
       {
@@ -301,11 +314,25 @@ export const routes: Routes = [
         redirectTo: 'marketing-hub',
         pathMatch: 'full'
       },
+      // 客戶培育（線索管理）— main 側新增，合併保留
+      {
+        path: 'lead-nurturing',
+        loadComponent: () => import('./lead-nurturing/lead-management.component').then(m => m.LeadManagementComponent),
+        title: '線索管理',
+        canActivate: [membershipGuard]
+      },
       // 數據分析 - 需要高級會員
       {
         path: 'analytics',
         loadComponent: () => import('./views/analytics-view.component').then(m => m.AnalyticsViewComponent),
         title: '數據分析',
+        canActivate: [membershipGuard]
+      },
+      // 數據報告（分析中心詳細版）— main 側新增，合併保留
+      {
+        path: 'analytics-center',
+        loadComponent: () => import('./analytics/analytics-center.component').then(m => m.AnalyticsCenterComponent),
+        title: '數據報告',
         canActivate: [membershipGuard]
       },
       // 🆕 管理員後台（技術運維向：API 池管理/容量規劃/智能運維/審計日誌/安全中心等）
@@ -340,7 +367,7 @@ export const routes: Routes = [
   // 404 fallback
   {
     path: '**',
-    redirectTo: 'dashboard'
+    redirectTo: 'home'
   }
 ];
 
@@ -359,7 +386,9 @@ export const routes: Routes = [
  */
 export const VIEW_ROUTE_MAP: Record<string, string> = {
   // ============ 核心 ============
+  'home': '/dashboard',
   'dashboard': '/dashboard',
+  'messages': '/messages',
   'accounts': '/accounts',
   'add-account': '/accounts',
   'add-account-advanced': '/accounts',
@@ -423,14 +452,14 @@ export const VIEW_ROUTE_MAP: Record<string, string> = {
   
   // ============ 客戶管理 ============
   'leads': '/leads',
-  'lead-nurturing': '/leads',
+  'lead-nurturing': '/lead-nurturing',
   'member-database': '/leads',
   'user-tracking': '/leads',
   'nurturing-analytics': '/analytics',
   
   // ============ 數據分析 ============
   'analytics': '/analytics',
-  'analytics-center': '/analytics',
+  'analytics-center': '/analytics-center',
   
   // ============ 系統/兼容 ============
   'performance': '/settings',
